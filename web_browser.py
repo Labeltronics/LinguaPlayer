@@ -81,6 +81,7 @@ class BrowserWindow(QDialog):
         for text,fn in [('Buka',self.navigate),('Download',lambda:self.manager.show()),('Hapus data',self.clear_data)]:
             b=QPushButton(text);b.clicked.connect(fn);row.addWidget(b)
         row=QHBoxLayout();box.addLayout(row);self.safe_search_off=QCheckBox('Google SafeSearch: Off');self.safe_search_off.setChecked(owner.settings.value('google_safe_off',True,type=bool));self.safe_search_off.toggled.connect(self.save_search_preference);row.addWidget(self.safe_search_off)
+        dns_button=QPushButton('DNS 1.1.1.1');dns_button.clicked.connect(self.dns_settings);row.addWidget(dns_button)
         button=QPushButton('Proxy / akses jaringan');button.clicked.connect(self.proxy_settings);row.addWidget(button);row.addWidget(QLabel('Tidak ada filter konten aplikasi. Blokir ISP/akun tetap bergantung koneksi/proxy yang berfungsi.'));row.addStretch()
         self.tabs=QTabWidget();self.tabs.setTabsClosable(True);self.tabs.tabCloseRequested.connect(self.close_tab);self.tabs.currentChanged.connect(self.tab_changed)
         split=QSplitter(Qt.Vertical);split.addWidget(self.tabs);panel=QWidget();pbox=QVBoxLayout(panel);row=QHBoxLayout();pbox.addLayout(row)
@@ -133,6 +134,9 @@ class BrowserWindow(QDialog):
     def save_search_preference(self,value):
         if not self.private and self.owner.storage_enabled:self.owner.settings.setValue('google_safe_off',value)
         self.status.setText('Preferensi SafeSearch diterapkan pada pencarian Google berikutnya. Google/administrator dapat menguncinya.')
+    def dns_settings(self):
+        from dns_settings import DnsDialog
+        dialog=DnsDialog(self);dialog.exec()
     def proxy_settings(self):
         from network_preferences import current,configure,apply_qt,save_private_configuration
         data=current();dialog=QDialog(self);dialog.setWindowTitle('Proxy browser & Download Manager • seluruh proses');form=QFormLayout(dialog);mode=QComboBox()

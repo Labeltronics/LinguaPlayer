@@ -11,6 +11,10 @@ $Model = Join-Path $PSScriptRoot 'models\midas-small.onnx'
 if (-not (Test-Path $Model)) { Invoke-WebRequest -Uri 'https://github.com/isl-org/MiDaS/releases/download/v2_1/model-small.onnx' -OutFile $Model }
 $ModelHash = (Get-FileHash $Model -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($ModelHash -ne '2d8c6cb8f415229daf1eb041024208e2608c9f98e17c81cc7c6ecb449c56fd58') { throw 'Checksum model kedalaman tidak cocok.' }
+$DnsPlan = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\cloudflare_dns.ps1 -Mode Plan
+if ($LASTEXITCODE -ne 0) { throw 'DNS helper plan gagal.' }
+$DnsPlanObject = $DnsPlan | ConvertFrom-Json
+if ($DnsPlanObject.writes_dns -or $DnsPlanObject.servers[0] -ne '1.1.1.1') { throw 'DNS helper plan tidak sah.' }
 & $Python make_icon.py
 if ($LASTEXITCODE -ne 0) { throw 'Pembuatan ikon gagal.' }
 & $Python -m unittest discover -s tests -v
@@ -18,7 +22,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Tes gagal.' }
 $VlcDirectory = Join-Path $env:ProgramFiles 'VideoLAN\VLC'
 if ($env:LINGUAPLAYER_VLC_DIR) { $VlcDirectory = $env:LINGUAPLAYER_VLC_DIR }
 if (-not (Test-Path (Join-Path $VlcDirectory 'libvlc.dll'))) { throw 'Pasang VLC Windows 64-bit resmi dahulu, atau set LINGUAPLAYER_VLC_DIR.' }
-& $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name Cyber80Players --icon assets/cyber80.ico --add-data "assets;assets" --collect-all imageio_ffmpeg --collect-all onnxruntime --collect-all langdetect --add-data "models;models" --add-data "${VlcDirectory};vlc" app.py
+& $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name Cyber80Players --icon assets/cyber80.ico --add-data "assets;assets" --add-data "cloudflare_dns.ps1;." --collect-all imageio_ffmpeg --collect-all onnxruntime --collect-all langdetect --add-data "models;models" --add-data "${VlcDirectory};vlc" app.py
 if ($LASTEXITCODE -ne 0) { throw 'Build gagal.' }
 & $Python optimize_bundle.py
 if ($LASTEXITCODE -ne 0) { throw 'Optimasi paket gagal.' }

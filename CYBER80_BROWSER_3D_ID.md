@@ -99,3 +99,9 @@ Browser multimedia kini membuka profil privat secara default. Browser normal tet
 Mesin Chromium tetap dibundel agar deteksi media dan integrasi Download Manager tidak hilang. WebView2 belum dipakai dalam edisi ini. Paket diperkecil dengan membuang resource debug, locale selain Inggris/Indonesia, QML eksternal yang tidak dipakai frontend Widgets, serta GUI/skin/locale milik aplikasi VLC standalone. Decoder, demux, akses jaringan, FFmpeg, MiDaS/ONNX dan komponen browser produksi dipertahankan. OPTIMASI_PAKET.json merinci pengurangan ukuran sebelum ZIP.
 
 Panel mendeteksi tautan download dokumen/file umum selain video/audio. Content-Disposition attachment dan a[download] didukung; tombol Download Manager → Tambah URL tetap menerima file HTTP/HTTPS umum. Pengambilan URL tidak bergantung codec playback. Download native Chromium juga menerima file selain media. Pilihan kualitas HLS/DASH mengikuti subset yang didokumentasikan di atas; tidak ada jaminan semua situs, DRM, enkripsi, live, token kedaluwarsa atau akses login dapat diunduh.
+
+## Cloudflare DNS 1.1.1.1
+
+Browser → DNS 1.1.1.1 menampilkan adaptor dan DNS Windows saat ini. Pilih adaptor, catat konfigurasi lama, lalu Terapkan 1.1.1.1 dan setujui UAC Windows. Server biasa Cloudflare: 1.1.1.1, 1.0.0.1, 2606:4700:4700::1111, 2606:4700:4700::1001; bukan resolver Families. Pengaturan bersifat sistem untuk adaptor itu. Tekan Periksa DNS untuk memverifikasi hasil, jangan menganggap membuka UAC berarti berhasil. DNS otomatis/DHCP bukan pemulihan DNS khusus lama. Tidak ada perubahan DNS saat startup aplikasi.
+
+Helper tidak mengatur DoH, menonaktifkan Defender/firewall, verifikasi HTTPS atau sandbox. Proxy/VPN/kebijakan akun/jaringan tetap bisa mengubah jalur resolver dan SafeSearch. Pengujian CI hanya memeriksa rencana/sintaks helper tanpa mengubah DNS mesin build; penerapan dengan Administrator pada komputer pengguna belum diuji di sini.

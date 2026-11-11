@@ -41,6 +41,12 @@ def run_browser_checks(owner):
             stage='HTTP download queue';manager=owner.get_download_manager();target=root/'queued.bin';record=manager.add(base+'/download.bin','queued.bin',target=target,private=True)
             wait(lambda:record['status'] in ('Completed','Failed'));assert record['status']=='Completed',record;assert target.read_bytes()==payload;report['download_queue_real_http']='PASS'
             stage='document detection and download';wait(lambda:any(v['name']=='document.pdf' for v in browser.media));item=next(v for v in browser.media if v['name']=='document.pdf');doc_target=root/'saved-document.pdf';doc_record=manager.add(item['url'],item['name'],target=doc_target,private=True,provider=browser.headers_for);wait(lambda:doc_record['status'] in ('Completed','Failed'));assert doc_record['status']=='Completed',doc_record;assert doc_target.read_bytes()==document;report['document_detection_and_download']='PASS'
+            stage='DNS adapter inspection'
+            from dns_settings import DnsDialog
+            dns=DnsDialog(owner)
+            try:
+                wait(lambda:dns.process is not None and dns.process.state().name=='NotRunning');assert dns.rows,dns.status.text();report['dns_adapter_inspection_read_only']='PASS'
+            finally:dns.close()
             stage='native Chromium download';native=root/'native.bin'
             with patch.object(QFileDialog,'getSaveFileName',return_value=(str(native),'')):
                 view.page().download(QUrl(base+'/download.bin'),'native.bin');wait(lambda:native.is_file() or any(r['kind']=='native' and r['status']=='Failed' for r in manager.records))
