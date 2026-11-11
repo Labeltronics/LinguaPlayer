@@ -25,3 +25,10 @@ class BundleTests(unittest.TestCase):
             response.headers['Content-Disposition']='attachment; filename="document.pdf"'
             self.assertTrue(inspect_media('https://example.test/document.pdf')['media'])
         for ext in ('.wma','.wmv','.aiff','.m2ts','.vob','.ape'):self.assertIn(ext,MEDIA_EXT)
+
+    def test_dom_json_transport_and_invalid_payloads(self):
+        from web_transfer import decode_scan_rows
+        rows=[{'url':'https://example.test/document.pdf','kind':'file'}]
+        import json
+        self.assertEqual(decode_scan_rows(json.dumps(rows)),rows);self.assertEqual(decode_scan_rows(rows),rows)
+        for value in ('not json','{}',None,'x'*131073,[{'url':4},None]):self.assertEqual(decode_scan_rows(value),[])

@@ -61,3 +61,12 @@ def atomic_json(path,value):
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);temp=path.with_name(path.name+'.'+uuid.uuid4().hex+'.tmp')
     try:temp.write_text(json.dumps(value,ensure_ascii=False),encoding='utf-8');os.replace(temp,path)
     finally:temp.unlink(missing_ok=True)
+
+def decode_scan_rows(value):
+    """Qt JS transport supports JSON text reliably across PySide versions."""
+    if isinstance(value,str):
+        if len(value)>128*1024:return []
+        try:value=json.loads(value)
+        except (ValueError,TypeError):return []
+    if not isinstance(value,list):return []
+    return [r for r in value[:100] if isinstance(r,dict) and isinstance(r.get('url'),str) and len(r['url'])<=16384]

@@ -5,10 +5,10 @@ from PySide6.QtCore import Qt,QUrl,QTimer,QObject,Signal,QRunnable,QThreadPool
 from PySide6.QtWidgets import (QDialog,QVBoxLayout,QHBoxLayout,QPushButton,QLineEdit,QTabWidget,QSplitter,QWidget,QTableWidget,QTableWidgetItem,QLabel,QInputDialog,QFileDialog,QMessageBox,QAbstractItemView,QCheckBox,QComboBox,QSpinBox,QFormLayout,QDialogButtonBox)
 from PySide6.QtWebEngineCore import QWebEnginePage,QWebEngineProfile,QWebEngineSettings,QWebEngineUrlRequestInterceptor,QWebEngineUrlRequestInfo
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from web_transfer import checked_url,origin,safe_headers,inspect_media,read_document,MEDIA_EXT,atomic_json
+from web_transfer import checked_url,origin,safe_headers,inspect_media,read_document,MEDIA_EXT,atomic_json,decode_scan_rows
 from stream_manifests import hls_plan,dash_plan
 
-DOM_SCAN="""(()=>{let out=[];for(let e of document.querySelectorAll('video,audio,video source,audio source')){let u=e.currentSrc||e.src;if(u)out.push({url:u,kind:e.tagName.toLowerCase(),mime:e.type||''});}for(let e of document.querySelectorAll('a[download]'))if(e.href)out.push({url:e.href,kind:'file',mime:''});return out.slice(0,100);})()"""
+DOM_SCAN="""(()=>{let out=[];for(let e of document.querySelectorAll('video,audio,video source,audio source')){let u=e.currentSrc||e.src;if(u)out.push({url:u,kind:e.tagName.toLowerCase(),mime:e.type||''});}for(let e of document.querySelectorAll('a[download]'))if(e.href)out.push({url:e.href,kind:'file',mime:''});return JSON.stringify(out.slice(0,100));})()"""
 class Interceptor(QWebEngineUrlRequestInterceptor):
     candidate=Signal(object)
     def interceptRequest(self,info):
@@ -194,7 +194,7 @@ class BrowserWindow(QDialog):
         if not self.isVisible() or not self.current():return
         self.current().page().runJavaScript(DOM_SCAN,self.scan_result)
     def scan_result(self,rows):
-        if not isinstance(rows,list):return
+        rows=decode_scan_rows(rows);self.last_dom_rows=len(rows)
         for row in rows:
             if isinstance(row,dict) and row.get('url','').startswith(('http://','https://')):self.detect({'url':row['url'],'known':True,'allow_file':row.get('kind')=='file','headers':{}})
     def detect(self,candidate):
