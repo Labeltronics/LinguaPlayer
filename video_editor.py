@@ -71,6 +71,7 @@ class Timeline(QWidget):
         if mode=='move':
             changed['start']=max(0,vp.snap(p,old['start']+delta));row=int((event.position().y()-self.TOP)//self.ROW)
             if 0<=row<len(p['tracks']) and not p['tracks'][row]['locked'] and vp.compatible(p['tracks'][row],old):changed['track']=p['tracks'][row]['id']
+            if changed['track']!=old['track'] and vp.track(p,changed['track']).get('preset')=='greenscreen':vp.green_screen_defaults(changed)
             if self.studio.snapping.isChecked():
                 targets=[self.studio.playhead]+[v for other in p['clips'] if other['id']!=old['id'] for v in (other['start'],other['start']+other['duration'])]
                 for target in sorted(targets,key=lambda t:abs(t-changed['start'])):
@@ -92,7 +93,7 @@ class VideoStudio(QDialog):
         super().__init__(owner,Qt.Window);self.owner=owner;self.project=vp.new_project();self.history=vp.History(self.project);self.project_path=None;self.selected='';self.selected_track=self.project['tracks'][1]['id'];self.playhead=0.;self.dirty=False;self.released=False;self.job=None;self.import_job=None;self.job_kind='';self.last_output='';self.proxy_player=None;self.assets=[];self.fields={};self.revision=0;self.pending_still=False;self.job_revision=0;self.cache=tempfile.TemporaryDirectory(prefix='cyber80-studio-');self.autosave_path=owner.log_path.parent/f'video-studio-autosave-{owner.window_number}.cyber80.json'
         self.setWindowTitle('Cyber80 Video Studio • Multilayer Editor');self.resize(1400,900);self.setAcceptDrops(True)
         box=QVBoxLayout(self)
-        for buttons in [[('Proyek baru',self.new),('Buka proyek',self.open),('Simpan',self.save),('Simpan sebagai',lambda:self.save(True)),('Pulihkan autosave',self.recover),('Undo',lambda:self.undo(-1)),('Redo',lambda:self.undo(1)),('Pengaturan proyek',self.settings_dialog)], [('Impor media',self.import_dialog),('Tambah layer',self.add_track),('Warna / latar',self.add_color),('Teks / judul',self.add_text),('Impor SRT',self.import_srt),('Subtitle AI film aktif',self.copy_ai),('Split di playhead',self.split),('Duplikat',self.duplicate),('Hapus klip',self.delete)], [('Perbarui preview frame',self.preview_frame),('Render & putar proxy',lambda:self.export(True)),('Ekspor MP4',lambda:self.export(False)),('Batalkan render',self.cancel),('Putar hasil',self.play_result),('Relink sumber',self.relink),('Buka sumber di player / AI',self.open_source)]]:
+        for buttons in [[('Proyek baru',self.new),('Buka proyek',self.open),('Simpan',self.save),('Simpan sebagai',lambda:self.save(True)),('Pulihkan autosave',self.recover),('Undo',lambda:self.undo(-1)),('Redo',lambda:self.undo(1)),('Pengaturan proyek',self.settings_dialog)], [('Impor media',self.import_dialog),('Tambah layer',self.add_track),('Layer Green Screen',self.add_green_screen),('Warna / latar',self.add_color),('Teks / judul',self.add_text),('Impor SRT',self.import_srt),('Subtitle AI film aktif',self.copy_ai),('Split di playhead',self.split),('Duplikat',self.duplicate),('Hapus klip',self.delete)], [('Perbarui preview frame',self.preview_frame),('Render & putar proxy',lambda:self.export(True)),('Ekspor MP4',lambda:self.export(False)),('Batalkan render',self.cancel),('Putar hasil',self.play_result),('Relink sumber',self.relink),('Buka sumber di player / AI',self.open_source)]]:
             row=QHBoxLayout();box.addLayout(row)
             for title,fn in buttons:b=QPushButton(title);b.clicked.connect(fn);row.addWidget(b)
         upper=QSplitter(Qt.Horizontal);self.bin=QListWidget();self.bin.setMinimumWidth(150);self.bin.setMaximumWidth(230);self.bin.itemDoubleClicked.connect(self.add_asset);upper.addWidget(self.bin)
@@ -101,10 +102,14 @@ class VideoStudio(QDialog):
         for title,fn in [('Frame −',lambda:self.seek(max(0,self.playhead-1/vp.fps(self.project)))),('Frame +',lambda:self.seek(self.playhead+1/vp.fps(self.project))),('Awal',lambda:self.seek(0))]:b=QPushButton(title);b.clicked.connect(fn);row.addWidget(b)
         self.summary=QLabel();self.summary.setWordWrap(True);mb.addWidget(self.summary);upper.addWidget(middle)
         panel=QWidget();form=QFormLayout(panel);self.clip_name=QLineEdit();form.addRow('Nama klip',self.clip_name);self.clip_track=QComboBox();form.addRow('Layer tujuan',self.clip_track)
-        definitions=[('start','Posisi timeline (s)',0,86400,3),('in','Source in (s)',0,86400,3),('duration','Durasi hasil (s)',.001,86400,3),('speed','Speed',.1,10,2),('x','Posisi X (%)',-200,200,2),('y','Posisi Y (%)',-200,200,2),('width','Lebar kotak (%)',1,400,2),('height','Tinggi kotak (%)',1,400,2),('scale','Skala / zoom',.01,10,2),('opacity','Opacity',0,1,2),('volume','Volume klip (dB)',-60,12,1),('pan','Pan kiri/kanan',-1,1,2),('fade_in','Fade masuk (s)',0,86400,3),('fade_out','Fade keluar (s)',0,86400,3),('brightness','Brightness',-1,1,2),('contrast','Contrast',0,3,2),('saturation','Saturation',0,3,2),('font_size','Ukuran teks (% tinggi)',1,30,2),('blur','Blur',0,20,1),('chroma_similarity','Chroma similarity',.01,1,2),('chroma_blend','Chroma blend',0,1,2)]
+        definitions=[('start','Posisi timeline (s)',0,86400,3),('in','Source in (s)',0,86400,3),('duration','Durasi hasil (s)',.001,86400,3),('speed','Speed',.1,10,2),('x','Posisi X (%)',-200,200,2),('y','Posisi Y (%)',-200,200,2),('width','Lebar kotak (%)',1,400,2),('height','Tinggi kotak (%)',1,400,2),('scale','Skala / zoom',.01,10,2),('opacity','Opacity',0,1,2),('volume','Volume klip (dB)',-60,12,1),('pan','Pan kiri/kanan',-1,1,2),('fade_in','Fade masuk (s)',0,86400,3),('fade_out','Fade keluar (s)',0,86400,3),('brightness','Brightness',-1,1,2),('contrast','Contrast',0,3,2),('saturation','Saturation',0,3,2),('font_size','Ukuran teks (% tinggi)',1,30,2),('blur','Blur',0,20,1),('chroma_similarity','Toleransi warna kunci',.01,1,2),('chroma_blend','Kehalusan tepi',0,1,2)]
         for key,label,lo,hi,decimals in definitions:
             spin=QDoubleSpinBox();spin.setRange(lo,hi);spin.setDecimals(decimals);spin.setSingleStep(.1 if decimals else 1);form.addRow(label,spin);self.fields[key]=spin
         self.fit=QComboBox();self.fit.addItems(['contain','cover','stretch']);form.addRow('Fit / crop',self.fit);self.chroma=QCheckBox('Aktifkan chroma key');form.addRow(self.chroma);self.chroma_color=QLineEdit('#00ff00');form.addRow('Warna chroma',self.chroma_color)
+        row=QHBoxLayout()
+        for label,fn in [('Preset Green Screen',self.green_screen_preset),('Pilih warna kunci',self.pick_chroma)]:
+            button=QPushButton(label);button.clicked.connect(fn);row.addWidget(button)
+        form.addRow(row)
         self.rotation=QComboBox();self.rotation.addItems(['0','90','180','270']);form.addRow('Rotasi',self.rotation);self.color=QLineEdit('#ffffff');form.addRow('Warna #RRGGBB',self.color);self.has_audio=QCheckBox('Gunakan audio video');form.addRow(self.has_audio);self.text=QTextEdit();self.text.setMaximumHeight(110);form.addRow('Teks / SRT',self.text)
         for title,fn in [('Terapkan properti klip',self.apply_properties),('Tambah keyframe di playhead',self.add_keyframe),('Hapus semua keyframe',self.clear_keyframes)]:b=QPushButton(title);b.clicked.connect(fn);form.addRow(b)
         self.keyframes=QListWidget();self.keyframes.setMaximumHeight(90);self.keyframes.itemDoubleClicked.connect(self.goto_keyframe);form.addRow('Keyframe',self.keyframes);scroll=QScrollArea();scroll.setWidgetResizable(True);scroll.setWidget(panel);scroll.setMinimumWidth(300);upper.addWidget(scroll);upper.setSizes([180,800,330]);box.addWidget(upper,1)
@@ -171,6 +176,7 @@ class VideoStudio(QDialog):
             if c['speed']!=old['speed'] and abs(c['duration']-old['duration'])<.002:c['duration']=old['duration']*old['speed']/c['speed'];c['keyframes']=[{**k,'time':k['time']*old['speed']/c['speed']} for k in c['keyframes']]
             c['start']=vp.snap(self.project,c['start']);c['duration']=max(1/vp.fps(self.project),vp.snap(self.project,c['duration']));c['keyframes']=[k for k in c['keyframes'] if k['time']<=c['duration']];c['fit']=self.fit.currentText();c['chroma']=self.chroma.isChecked();c['chroma_color']=self.chroma_color.text();c['name']=self.clip_name.text()[:160];c['track']=self.clip_track.currentData();c['rotation']=int(self.rotation.currentText());c['color']=self.color.text();c['text']=self.text.toPlainText();c['has_audio']=self.has_audio.isChecked() if c['kind']=='video' else c['kind']=='audio'
             if vp.track(self.project,c['track'])['locked']:raise ValueError('Layer tujuan terkunci.')
+            if c['track']!=old['track'] and vp.track(self.project,c['track']).get('preset')=='greenscreen' and c['kind'] in ('video','image'):vp.green_screen_defaults(c)
         self.mutate(change)
     def apply_track(self):
         def change():
@@ -211,7 +217,24 @@ class VideoStudio(QDialog):
         if job:job.deleteLater()
         self.message('Impor selesai. Double-click media di koleksi untuk menambahkannya lagi di playhead.')
     def add_asset(self,item,at=None):
-        asset=item.data(Qt.UserRole);c=vp.new_clip(self.target_track(asset['kind']),asset['kind'],asset['path'],max(1/vp.fps(self.project),vp.snap(self.project,asset['duration'])),has_audio=asset['has_audio'],source_has_audio=asset['has_audio'],source_duration=asset['duration'],name=asset['name']);self.insert(c,at)
+        asset=item.data(Qt.UserRole);target=self.target_track(asset['kind']);c=vp.new_clip(target,asset['kind'],asset['path'],max(1/vp.fps(self.project),vp.snap(self.project,asset['duration'])),has_audio=asset['has_audio'],source_has_audio=asset['has_audio'],source_duration=asset['duration'],name=asset['name'])
+        if target and vp.track(self.project,target).get('preset')=='greenscreen' and asset['kind'] in ('video','image'):vp.green_screen_defaults(c)
+        self.insert(c,at)
+    def add_green_screen(self):
+        created=[]
+        if self.mutate(lambda:created.append(vp.add_green_screen_track(self.project))):
+            self.selected='';self.select_track(created[0]['id']);self.message('Layer Green Screen siap. Pilih Impor media untuk video/gambar berlatar hijau. Letakkan background di layer bawah; atur toleransi/kehalusan tepi lalu Terapkan properti klip.')
+    def green_screen_preset(self):
+        c=self.current()
+        if not c or c['kind'] not in ('video','image'):self.message('Pilih klip video/gambar untuk Green Screen.');return
+        if vp.track(self.project,c['track'])['locked']:self.message('Layer terkunci.');return
+        self.chroma.setChecked(True);self.chroma_color.setText('#00ff00');self.fields['chroma_similarity'].setValue(.12);self.fields['chroma_blend'].setValue(.05);self.apply_properties()
+    def pick_chroma(self):
+        c=self.current()
+        if not c or c['kind'] not in ('video','image'):self.message('Pilih klip video/gambar.');return
+        if vp.track(self.project,c['track'])['locked']:self.message('Layer terkunci.');return
+        selected=QColorDialog.getColor(QColor(self.chroma_color.text()),self,'Pilih warna yang akan dihapus')
+        if selected.isValid():self.chroma_color.setText(selected.name());self.chroma.setChecked(True);self.apply_properties()
     def add_color(self):
         selected=QColorDialog.getColor(QColor(self.project['settings']['background']),self)
         if selected.isValid():self.insert(vp.new_clip(self.target_track('color'),'color',duration=5,color=selected.name(),name='Latar warna'))

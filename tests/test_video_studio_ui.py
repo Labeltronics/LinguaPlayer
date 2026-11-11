@@ -21,3 +21,15 @@ class StudioUITests(unittest.TestCase):
                 editor.debounce.stop()
                 if editor.job:editor.cancel();editor.job.wait(5000);q.processEvents()
                 editor.dirty=False;editor.close();owner.close();q.processEvents()
+
+    def test_green_screen_layer_import_and_properties(self):
+        from PySide6.QtWidgets import QListWidgetItem
+        from PySide6.QtGui import QImage,QColor
+        with tempfile.TemporaryDirectory() as d:
+            owner=QWidget();owner.log_path=Path(d)/'log';owner.window_number=99;owner.storage_enabled=False;owner.private_session=False;owner.cues=[];editor=VideoStudio(owner);editor.debounce.timeout.disconnect()
+            try:
+                editor.add_green_screen();target=editor.selected_track;self.assertEqual(v.track(editor.project,target)['preset'],'greenscreen')
+                file=Path(d)/'actor.png';image=QImage(16,16,QImage.Format_RGB32);image.fill(QColor('#00ff00'));image.save(str(file));item=QListWidgetItem('actor');item.setData(Qt.UserRole,{'path':str(file.resolve()),'kind':'image','duration':1.,'has_audio':False,'name':'actor'})
+                editor.add_asset(item);clip=editor.current();self.assertEqual(clip['track'],target);self.assertTrue(clip['chroma']);self.assertEqual(editor.chroma_color.text(),'#00ff00')
+                editor.chroma_color.setText('#0000ff');editor.fields['chroma_similarity'].setValue(.2);editor.apply_properties();self.assertEqual(editor.current()['chroma_color'],'#0000ff');editor.green_screen_preset();self.assertEqual(editor.current()['chroma_color'],'#00ff00')
+            finally:editor.debounce.stop();editor.dirty=False;editor.close();owner.close();q.processEvents()

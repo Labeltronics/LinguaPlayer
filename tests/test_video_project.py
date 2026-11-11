@@ -71,3 +71,21 @@ class ProjectTests(unittest.TestCase):
             previous=out.read_bytes()
             with self.assertRaises(InterruptedError):r.render(ff,p,out,cancelled=lambda:True)
             self.assertEqual(out.read_bytes(),previous);self.assertFalse(list(d.glob('*.partial.mp4')))
+
+    def test_green_screen_preset_layer_order_and_save(self):
+        p=v.new_project();before=len(p['tracks']);t=v.add_green_screen_track(p)
+        self.assertEqual(len(p['tracks']),before+1);self.assertLess(p['tracks'].index(t),next(i for i,x in enumerate(p['tracks']) if x['name']=='Judul'))
+        c=v.new_clip(t['id'],'image',str(Path('actor.png').resolve()),1);v.green_screen_defaults(c);p['clips'].append(c);v.validate(p)
+        self.assertTrue(c['chroma']);self.assertEqual(c['chroma_color'],'#00ff00');self.assertFalse(v.compatible(t,{'kind':'audio'}));self.assertFalse(v.compatible(t,{'kind':'text'}))
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)/'green.cyber80.json';v.save(p,path);q=v.load(path);self.assertEqual(q,p)
+    def test_real_green_screen_preserves_foreground_reveals_background(self):
+        ff=ffmpeg()
+        with tempfile.TemporaryDirectory() as d:
+            d=Path(d);source=d/'actor.mp4'
+            subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','color=c=0x00ff00:s=160x120:r=10:d=1,drawbox=x=40:y=30:w=80:h=60:color=red:t=fill','-c:v','libx264','-pix_fmt','yuv420p',str(source)],check=True,**r.flags())
+            p=v.new_project();p['settings'].update(width=160,height=120,fps='10',background='#0000ff');t=v.add_green_screen_track(p);c=v.new_clip(t['id'],'video',str(source.resolve()),1,has_audio=False);v.green_screen_defaults(c);p['clips'].append(c)
+            original=source.read_bytes();target=d/'keyed.mp4';r.render(ff,p,target)
+            raw=subprocess.run([ff,'-v','error','-ss','0.3','-i',str(target),'-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1'],check=True,stdout=subprocess.PIPE,**r.flags()).stdout
+            def pixel(x,y):return raw[(y*160+x)*3:(y*160+x)*3+3]
+            bg=pixel(10,10);fg=pixel(80,60);self.assertGreater(bg[2],180);self.assertLess(bg[1],60);self.assertGreater(fg[0],180);self.assertLess(fg[1],60);self.assertEqual(source.read_bytes(),original)

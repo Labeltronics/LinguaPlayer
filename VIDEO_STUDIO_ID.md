@@ -36,3 +36,11 @@ Autosave tiap 30 detik hanya bila penyimpanan aplikasi aktif dan sesi player tid
 Tes model/render mencakup split, undo/redo, JSON, frame boundary, layer terkunci, rentang sumber, keyframe, penolakan input tidak valid, warna piksel komposisi, audio nyata, ducking, title/subtitle, still preview, speed, chroma/blur/crop, pembatalan dan hash sumber. Tes UI mencakup properti, timeline, simpan dan preview asinkron.
 
 `HASIL_UJI_WINDOWS.json → playback.video_studio` mencatat pengujian EXE yang benar-benar berjalan: impor video/gambar/audio, split/undo, proyek, preview frame, komposisi MP4 beserta audio, teks dan subtitle, pemutaran VLC, serta keutuhan sumber. Pengujian DNS hanya membaca konfigurasi; tidak mengubah DNS mesin build.
+
+## Layer Green Screen
+
+Klik **Layer Green Screen** untuk menambah layer khusus di atas video biasa dan di bawah judul/subtitle. Pilih layer itu, lalu **Impor media** berupa video/gambar berlatar hijau. Chroma key langsung aktif dengan warna #00ff00, toleransi 0,12 dan kehalusan tepi 0,05. Letakkan video/gambar/latar pengganti pada layer di bawahnya.
+
+Untuk klip yang sudah ada, pindahkan ke layer Green Screen melalui properti atau drag timeline. Preset diterapkan saat pindah. **Preset Green Screen** mengaktifkan ulang nilai awal pada klip video/gambar yang terpilih. Gunakan **Pilih warna kunci** untuk hijau lain atau blue screen, kemudian sesuaikan **Toleransi warna kunci** dan **Kehalusan tepi**. Klik Terapkan properti klip, perbarui preview atau render proxy, lalu ekspor MP4.
+
+Layer tetap mendukung posisi, ukuran, keyframe, trim dan audio video. Perubahan disimpan dalam proyek dan dapat di-undo. Ini chroma key berdasarkan warna, bukan penghapus background AI; pencahayaan tidak rata, bayangan, rambut dan pantulan hijau dapat memerlukan penyesuaian. Belum ada despill khusus atau color picker dari piksel preview.

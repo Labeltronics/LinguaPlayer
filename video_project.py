@@ -9,7 +9,7 @@ def new_project():
     tracks=[]
     for name,kind in [('Latar','visual'),('Video 1','visual'),('Overlay / gambar','visual'),('Judul','visual'),('Subtitle','subtitle'),('Suara / narasi','voice'),('Musik','music'),('Efek suara','audio')]:tracks.append(new_track(name,kind))
     return {'schema':1,'settings':{'width':1920,'height':1080,'fps':'25','background':'#101827','ducking':False},'tracks':tracks,'clips':[]}
-def new_track(name,kind):return {'id':uid(),'name':str(name)[:80],'kind':kind,'hidden':False,'locked':False,'muted':False,'solo':False,'volume':0.0}
+def new_track(name,kind):return {'id':uid(),'name':str(name)[:80],'kind':kind,'preset':'normal','hidden':False,'locked':False,'muted':False,'solo':False,'volume':0.0}
 def new_clip(track,kind,path='',duration=5,**extra):
     c={'id':uid(),'track':track,'kind':kind,'path':str(path),'name':Path(path).name if path else kind,'start':0.,'in':0.,'duration':float(duration),'speed':1.,'source_duration':float(duration) if kind in ('video','audio') else 0.,'has_audio':kind=='audio','source_has_audio':kind in ('video','audio'),'x':0.,'y':0.,'width':100.,'height':100.,'scale':1.,'opacity':1.,'volume':0.,'pan':0.,'fade_in':0.,'fade_out':0.,'rotation':0,'brightness':0.,'contrast':1.,'saturation':1.,'color':'#ffffff','fit':'contain','blur':0.,'chroma':False,'chroma_color':'#00ff00','chroma_similarity':.1,'chroma_blend':.03,'font_size':5.,'text':'','keyframes':[]}
     c.update(extra);return c
@@ -63,7 +63,9 @@ def validate(p,sources=False):
     if duration(p)>86400:raise ValueError('Durasi proyek maksimum 24 jam.')
     return p
 def track(p,id):return next(t for t in p['tracks'] if t['id']==id)
-def compatible(t,c):return (t['kind']=='visual' and c['kind'] in ('video','image','color','text')) or (t['kind']=='subtitle' and c['kind']=='subtitle') or (t['kind'] in ('voice','music','audio') and c['kind']=='audio')
+def compatible(t,c):
+    if t.get('preset')=='greenscreen':return c['kind'] in ('video','image')
+    return (t['kind']=='visual' and c['kind'] in ('video','image','color','text')) or (t['kind']=='subtitle' and c['kind']=='subtitle') or (t['kind'] in ('voice','music','audio') and c['kind']=='audio')
 def value_at(c,key,t):
     rows=sorted(c['keyframes'],key=lambda k:k['time'])
     if not rows:return c[key]
@@ -109,3 +111,15 @@ class History:
         if s==self.states[self.index]:return
         self.states=self.states[:self.index+1]+[s];self.states=self.states[-100:];self.index=len(self.states)-1
     def step(self,n):self.index=max(0,min(len(self.states)-1,self.index+n));return json.loads(self.states[self.index])
+
+def add_green_screen_track(p):
+    if len(p['tracks'])>=32:raise ValueError('Maksimum 32 layer.')
+    count=sum(t.get('preset')=='greenscreen' for t in p['tracks'])+1
+    t=new_track('Green Screen '+str(count),'visual');t['preset']='greenscreen'
+    # Place foreground above ordinary video, while keeping titles/subtitles above it.
+    i=next((i for i,item in enumerate(p['tracks']) if item['kind']=='subtitle' or item['name']=='Judul' or any(c['track']==item['id'] and c['kind']=='text' for c in p['clips'])),len(p['tracks']))
+    p['tracks'].insert(i,t);return t
+def green_screen_defaults(c):
+    if c['kind'] not in ('video','image'):raise ValueError('Green Screen memerlukan klip video atau gambar.')
+    c.update(chroma=True,chroma_color='#00ff00',chroma_similarity=.12,chroma_blend=.05)
+    return c
