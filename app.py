@@ -239,7 +239,7 @@ class Window(PlayerExtras,QMainWindow):
         if QMessageBox.question(self,'Proses online','Audio video akan dikirim ke Google. Pemakaian API dapat dikenakan biaya. Lanjutkan?')!=QMessageBox.Yes: return
         lang=self.lang.currentData() if self.lang.currentText()==self.lang.itemText(self.lang.currentIndex()) else self.lang.currentText().strip()
         context=(self.path,self.model.text().strip(),lang,self.glossary.text().strip())
-        resume=self.retry_context==context and self.resume_offset>0 and bool(self.cues)
+        resume=self.retry_context==context and self.resume_offset>0
         position=self.resume_offset if resume else 0
         if not resume:self.fill([]);self.coverage=0.
         self.retry_context=context

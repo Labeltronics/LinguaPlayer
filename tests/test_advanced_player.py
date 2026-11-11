@@ -26,7 +26,7 @@ class AdvancedTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as d:
                 a=Path(d)/'a.mp4';b=Path(d)/'b.mp4';a.touch();b.touch()
                 w.open_path(str(a));other=w.open_second_player();other.open_path(str(b));q.processEvents()
-                self.assertIsNot(w.player,other.player);self.assertEqual(w.path,str(a));self.assertEqual(other.path,str(b))
+                self.assertIsNot(w.player,other.player);self.assertEqual(w.path,str(a.resolve()));self.assertEqual(other.path,str(b.resolve()))
                 self.assertEqual(w.playlist_widget.count(),1);self.assertEqual(other.playlist_widget.count(),1)
                 self.assertTrue(other.mute_action.isChecked())
                 self.assertIs(w.open_second_player(),other)
@@ -67,3 +67,13 @@ class AdvancedTests(unittest.TestCase):
         planes=(ctypes.c_void_p*1)();capture.callbacks[0](None,planes)
         capture.buffer[0]=91;capture.callbacks[1](None,None,planes);capture.callbacks[2](None,None)
         frame,revision=capture.snapshot();self.assertEqual(frame[0,0,0],91);self.assertEqual(revision,1)
+
+    @patch.object(app.vlc,'Instance',side_effect=fake_engine)
+    def test_resume_skips_successful_silent_chunk(self,factory):
+        w=app.Window();w.path='example.mp4';w.key.setText('dummy');w.resume_offset=10;w.cues=[]
+        w.retry_context=(w.path,w.model.text(),'id','')
+        fake_job=MagicMock();fake_job.isRunning.return_value=False
+        try:
+            with patch.object(app,'Job',return_value=fake_job) as job,patch.object(app.QMessageBox,'question',return_value=app.QMessageBox.Yes):
+                w.process();self.assertEqual(job.call_args.kwargs['resume_from'],10)
+        finally:w.close()

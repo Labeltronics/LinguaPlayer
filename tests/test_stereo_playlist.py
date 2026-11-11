@@ -22,7 +22,7 @@ class PlaylistTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             paths=[str(Path(d)/'Film satu.mp4'),str(Path(d)/'日本語.mkv')]
             for ext in ('m3u8','json'):
-                p=Path(d)/('playlist.'+ext);write_playlist(p,paths);self.assertEqual(read_playlist(p),paths)
+                p=Path(d)/('playlist.'+ext);write_playlist(p,paths);self.assertEqual(read_playlist(p),[str(Path(v).resolve()) for v in paths])
     def test_relative_playlist_resolves_from_playlist_folder(self):
         with tempfile.TemporaryDirectory() as d:
-            p=Path(d)/'list.m3u';p.write_text('#EXTM3U\nvideo.mp4\n',encoding='utf-8');self.assertEqual(read_playlist(p),[str(Path(d)/'video.mp4')])
+            p=Path(d)/'list.m3u';p.write_text('#EXTM3U\nvideo.mp4\n',encoding='utf-8');self.assertEqual(read_playlist(p),[str((Path(d)/'video.mp4').resolve())])

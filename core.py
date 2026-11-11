@@ -62,6 +62,7 @@ def request_json(url, key, payload, cancelled=lambda:False, progress=lambda text
         delay=0.;last=None
         try:
             wait_cancel(max(0,_NEXT_REQUEST-time.monotonic()),cancelled,progress)
+            if cancelled():raise InterruptedError('Dibatalkan')
             _NEXT_REQUEST=time.monotonic()+15
             progress(f'Menghubungi Gemini (percobaan {attempt+1}/2, batas waktu {timeout} detik) …')
             req=urllib.request.Request(url,data=json.dumps(payload).encode(),headers={

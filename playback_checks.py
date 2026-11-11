@@ -28,6 +28,7 @@ def run_playback_checks(window):
     window.auto_next_box.setChecked(False)
     flags={'creationflags':subprocess.CREATE_NO_WINDOW} if __import__('os').name=='nt' else {}
     with tempfile.TemporaryDirectory(prefix='lingua-playback-') as tmp:
+        tmp=str(Path(tmp).resolve())
         for suffix,vcodec,acodec in formats:
             clip=Path(tmp)/('Uji video dengan spasi.'+suffix)
             args=[ff,'-v','error','-y','-f','lavfi','-i','testsrc2=size=176x144:rate=12:duration=3',
