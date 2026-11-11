@@ -13,6 +13,8 @@ if ($env:LINGUAPLAYER_VLC_DIR) { $VlcDirectory = $env:LINGUAPLAYER_VLC_DIR }
 if (-not (Test-Path (Join-Path $VlcDirectory 'libvlc.dll'))) { throw 'Pasang VLC Windows 64-bit resmi dahulu, atau set LINGUAPLAYER_VLC_DIR.' }
 & $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name LinguaPlayer --collect-all imageio_ffmpeg --add-data "${VlcDirectory};vlc" app.py
 if ($LASTEXITCODE -ne 0) { throw 'Build gagal.' }
+Copy-Item QUICK_START_ID.txt dist\LinguaPlayer\
+Copy-Item LICENSE dist\LinguaPlayer\
 Copy-Item README_ID.md dist\LinguaPlayer\
 Copy-Item THIRD_PARTY.md dist\LinguaPlayer\
 Write-Host 'Selesai: dist\LinguaPlayer\LinguaPlayer.exe. Bagikan seluruh folder, bukan EXE saja.'

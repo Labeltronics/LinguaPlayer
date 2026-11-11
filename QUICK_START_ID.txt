@@ -1,0 +1,20 @@
+LINGUAPLAYER — WINDOWS SIAP PAKAI
+
+1. Ekstrak SELURUH isi ZIP ke folder biasa, misalnya C:\LinguaPlayer.
+2. Klik LinguaPlayer.exe. Folder _internal wajib tetap bersamanya.
+3. Isi Gemini API key, lalu tekan Simpan API key di Windows.
+   Pada akun Windows yang sama, key terisi otomatis saat aplikasi dibuka kembali.
+   Hapus key tersimpan menghapus key dari Windows Credential Manager.
+4. Klik Buka video lalu Buat subtitle online.
+5. Bahasa sumber dideteksi dari suara. Bahasa tujuan default Indonesia.
+   Audio mulai diproses dari awal video per 10 detik; setelah buffer pertama siap,
+   pemutaran berjalan dan bagian berikutnya diproses di belakang layar.
+   Jika API lambat, video dijeda agar suara tidak mendahului subtitle.
+   Ini bukan jaminan live translation tanpa jeda; internet dan API memengaruhi waktu tunggu.
+6. Koreksi teks/timing pada tabel setelah proses selesai. Ekspor SRT untuk offline.
+7. Untuk menonton tanpa internet: buka video lalu Buka SRT offline.
+
+Tidak perlu memasang Python atau VLC terpisah: runtime VLC dan FFmpeg dibundel.
+API key tidak ditanamkan pada EXE dan tidak masuk repository GitHub.
+Jangan jalankan dari dalam ZIP; ekstrak dahulu. Jangan pindahkan EXE sendirian.
+EXE belum memiliki tanda tangan penerbit/code signing.

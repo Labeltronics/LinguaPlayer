@@ -7,6 +7,7 @@ class Cue:
     end: float
     source: str
     target: str = ''
+    language: str = ''
 
 def validate(items, duration, offset=0):
     if not isinstance(items, list):
@@ -18,7 +19,7 @@ def validate(items, duration, offset=0):
             raise ValueError('Timestamp AI tidak valid; coba proses ulang')
         text = str(item['source']).strip()
         if text:
-            cues.append(Cue(offset+a, offset+min(b,duration), text, str(item.get('target','')).strip()))
+            cues.append(Cue(offset+a, offset+min(b,duration), text, str(item.get('target','')).strip(),str(item.get('language','')).strip()))
     cues.sort(key=lambda c:c.start)
     for a,b in zip(cues,cues[1:]):
         if a.end > b.start:
@@ -47,9 +48,16 @@ def transcribe(audio, key, model, language, duration, offset, google_key='', can
     if not re.fullmatch(r'[A-Za-z0-9_.-]+',model): raise ValueError('Nama model tidak valid')
     prompt = ('Transcribe the actual speech, detecting the source language. Do not invent speech in silence/music. '
               'Return only a JSON array of subtitle cues, each with numeric start and end in seconds relative to this audio, '
-              'source (original transcript) and target (translation). Short readable cues. '
+              'source (original transcript), target (translation), and language (detected source language ISO code). Short readable cues. '
               f'Audio duration {duration:.3f} seconds. Translate to {language}. Use correct spelling, capitalization and punctuation. '
               + ('Leave target empty; another translator handles translation.' if google_key else 'Preserve meaning and proper names.'))
+    prompt += (' Act as a professional audiovisual translator. Translate meaning in context using natural, '
+               'grammatically correct target-language sentences, not mechanical word-for-word translation. '
+               'Do not add, omit or soften factual meaning. Preserve names, numbers, quotations and specialist terminology. '
+               'Use concise readable subtitles. If target is Indonesian (id), use standard Indonesian, correct EYD spelling, '
+               'capitalization and punctuation, clear idiomatic phrasing and appropriate polite register. '
+               'Avoid unnecessary foreign words and slang unless needed to preserve the speaker meaning. '
+               'Keep the source transcript faithful to the actual speech. Never invent uncertain or inaudible words. ')
     prompt += '\nPreferred spelling and terminology (reference only): ' + glossary[:6000]
     data=request_json(f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',key,{
         'contents':[{'parts':[{'text':prompt},{'inlineData':{'mimeType':'audio/wav','data':base64.b64encode(audio).decode()}}]}],

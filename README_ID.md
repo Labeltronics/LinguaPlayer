@@ -4,7 +4,7 @@ Pemutar video berbasis VLC dengan pembuatan subtitle online dari audio memakai G
 
 ## Status jujur
 
-Paket ini berisi kode sumber lengkap dan skrip build, BELUM berisi EXE hasil build. Disiapkan di Linux; Windows/VLC GUI dan API berbayar belum diuji langsung. Tes otomatis menguji logika subtitle serta integrasi API dengan respons tiruan. Hasil transkripsi, terjemahan dan timestamp AI tidak dijamin 100%. Tidak ada klaim semua format/codec bisa diputar.
+Repository ini memuat sumber dan skrip build. Build EXE Windows telah berhasil, termasuk tes startup Qt/VLC/FFmpeg dan simpan-baca-hapus Windows Credential Manager. Tes API Gemini langsung pada ucapan pendek menghasilkan transkrip dan terjemahan Indonesia. Tes ini tidak membuktikan performa semua video atau akurasi 100%. Hasil transkripsi, terjemahan dan timestamp AI tidak dijamin 100%. Tidak ada klaim semua format/codec bisa diputar.
 
 ## Membuat EXE di Windows 10/11 64-bit
 
@@ -19,11 +19,11 @@ Build memerlukan internet. VLC yang terpasang disalin utuh untuk mempertahankan 
 ## Memakai aplikasi
 
 1. Buka video lokal dengan tombol Buka video. Dialog menerima semua ekstensi; dukungan sebenarnya mengikuti VLC.
-2. Isi Gemini API key dari https://aistudio.google.com/apikey . Model default `gemini-2.5-flash`; ubah ke model audio yang tersedia pada akun Anda bila diperlukan.
+2. Isi Gemini API key dari https://aistudio.google.com/apikey . Model default `gemini-3.8-flash`; ubah ke model audio yang tersedia pada akun Anda bila diperlukan.
 3. Pilih bahasa target. Untuk bahasa lain ketik kode bahasa, misalnya `it`, `nl`, `ms` atau `zh-TW`.
 4. Isi kamus ejaan: contoh `Pdm. Kezia Sutjiwati; GBI; Nuel Cookies; kasih karunia`. Ini petunjuk kepada Gemini, bukan jaminan ejaan. Jika Google Translate dipakai, kamus ini membantu transkripsi; Basic v2 tidak memiliki glossary terjemahan khusus.
 5. Opsional: isi key Google Cloud Translation Basic v2 yang sudah diaktifkan dan memiliki billing/kuota. Jika kosong, Gemini sekaligus menerjemahkan. Google Translate sendiri tidak mengenali suara.
-6. Tekan Buat subtitle online. Konfirmasi mengirim audio ke Google. Audio diproses per 45 detik berurutan agar penggunaan memori terbatas. Proses ini bukan live streaming/realtime. Setelah seluruh proses berhasil, hasil muncul di tabel.
+6. Tekan Buat subtitle online. Konfirmasi mengirim audio ke Google. Audio diproses per 10 detik berurutan agar penggunaan memori terbatas. Setelah buffer awal siap, video diputar dan subtitle ditambahkan bertahap. Bagian berikutnya diproses di latar belakang. Jika pemutaran mendekati batas subtitle yang siap, video dijeda untuk menunggu API. Ini bukan live streaming/mikrofon dan bukan jaminan tanpa buffering.
 7. Koreksi ejaan, istilah, isi dan waktu di tabel. Klik dua kali pada baris untuk menuju adegan. Pilih tampilan bilingual/asli/terjemahan. Offset positif menampilkan subtitle lebih lambat.
 8. Ekspor SRT untuk offline. Mode Asli mengekspor transkrip; mode lain mengekspor terjemahan dengan fallback teks asli. SRT bilingual belum tersedia. Simpan proyek JSON untuk mempertahankan kedua teks dan lokasi video; tidak menyimpan key API.
 9. Untuk offline, taruh SRT bersama video dengan nama sama (film.mp4 dan film.srt), lalu buka menggunakan VLC. SRT tidak membakar teks ke video. Di aplikasi ini, buka video terlebih dahulu lalu tekan Buka SRT offline. Proyek JSON mempertahankan kedua bahasa; SRT dimuat sebagai teks satu bahasa.
@@ -34,7 +34,7 @@ Tekan Simpan API key di Windows untuk menyimpannya melalui Windows Credential Ma
 
 VLC mendukung format umum seperti MP4, MKV, AVI, MOV, WebM, MPEG, TS, M2TS, FLV, WMV, VOB, OGV serta berbagai codec seperti H.264/H.265, VP8/VP9, AV1 sesuai build dan perangkat. Performa 4K/8K bergantung hardware. DRM, file rusak, codec proprietari tertentu dan container nonstandar dapat gagal. Subtitle dibuat hanya dari track audio default FFmpeg; pemilihan multiaudio, URL online/YouTube, OCR subtitle, dubbing dan live microphone belum tersedia. "Online" dalam aplikasi ini berarti API transkripsi/terjemahan online, pemutar menggunakan file lokal.
 
-Batas proses saat ini: potongan audio tanpa overlap dapat memisahkan kata pada batas 45 detik; timing diperkirakan Gemini, bukan forced alignment. Pekerjaan yang gagal perlu diulang (belum ada cache/resume). Batal saat panggilan API menunggu timeout maksimal 120 detik; hasil parsial belum disimpan. Video tanpa audio menghasilkan pesan gagal. Harap uji video panjang sebelum penggunaan produksi.
+Batas proses saat ini: potongan audio tanpa overlap dapat memisahkan kata pada batas 10 detik; timing diperkirakan Gemini, bukan forced alignment. Pekerjaan yang gagal perlu diulang (belum ada cache/resume). Batal saat panggilan API menunggu timeout maksimal 120 detik; hasil parsial yang sudah diterima bisa diekspor dari tabel. Video tanpa audio menghasilkan pesan gagal. Harap uji video panjang sebelum penggunaan produksi.
 
 ## Ejaan dan akurasi
 
@@ -42,7 +42,7 @@ Untuk hasil baik: audio bersih, daftar nama/istilah, model transkripsi yang tepa
 
 ## Verifikasi
 
-Jalankan `python -m unittest discover -s tests -v`. Untuk penerimaan Windows, verifikasi MP4/MKV/AVI/WebM, audio dan volume, seek, cancel, key salah/kuota habis, video hening, terjemahan beberapa bahasa, edit, simpan/buka proyek dan SRT offline. API tidak boleh dianggap teruji hanya dari mock test.
+Jalankan `python -m unittest discover -s tests -v`. Untuk penerimaan Windows, verifikasi MP4/MKV/AVI/WebM, audio dan volume, seek, cancel, key salah/kuota habis, video hening, terjemahan beberapa bahasa, edit, simpan/buka proyek dan SRT offline. Tes API langsung pada sampel pendek sudah dilakukan; pengujian video nyata milik pengguna tetap diperlukan.
 
 ## Referensi
 
