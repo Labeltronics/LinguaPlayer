@@ -20,6 +20,8 @@ if ($env:LINGUAPLAYER_VLC_DIR) { $VlcDirectory = $env:LINGUAPLAYER_VLC_DIR }
 if (-not (Test-Path (Join-Path $VlcDirectory 'libvlc.dll'))) { throw 'Pasang VLC Windows 64-bit resmi dahulu, atau set LINGUAPLAYER_VLC_DIR.' }
 & $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name Cyber80Players --icon assets/cyber80.ico --add-data "assets;assets" --collect-all imageio_ffmpeg --collect-all onnxruntime --collect-all langdetect --add-data "models;models" --add-data "${VlcDirectory};vlc" app.py
 if ($LASTEXITCODE -ne 0) { throw 'Build gagal.' }
+& $Python optimize_bundle.py
+if ($LASTEXITCODE -ne 0) { throw 'Optimasi paket gagal.' }
 & $Python bundle_licenses.py
 if ($LASTEXITCODE -ne 0) { throw 'Penyalinan lisensi gagal.' }
 Copy-Item QUICK_START_ID.txt dist\Cyber80Players\

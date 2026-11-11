@@ -29,7 +29,7 @@ class Probe(QRunnable):
     def run(self):
         c=self.candidate
         try:
-            data=inspect_media(c['url'],c.get('headers'));data['headers']=c.get('headers',{});data['qualities']=[]
+            data=inspect_media(c['url'],c.get('headers'),allow_file=c.get('allow_file',False));data['headers']=c.get('headers',{});data['qualities']=[]
             if data['media'] and data['kind'] in ('hls','dash'):
                 text,final=read_document(c['url'],c.get('headers'))
                 if data['kind']=='hls':data['qualities']=sorted(hls_plan(text,final)['variants'],key=lambda v:v['bandwidth'])
@@ -58,13 +58,14 @@ class WebView(QWebEngineView):
     def __init__(self,browser):super().__init__();self.browser=browser
     def createWindow(self,kind):return self.browser.add_tab('about:blank')
 class BrowserWindow(QDialog):
-    def __init__(self,owner,private=False):
+    def __init__(self,owner,private=True):
         super().__init__(owner,Qt.Window);self.owner=owner;self.private=private;self.manager=owner.get_download_manager();
         from network_preferences import initialize
         initialize(owner.persistence_available);self.setWindowTitle('Cyber80 Browser'+(' • Privat' if private else ''));self.resize(1250,850)
         self.profile=QWebEngineProfile(self) if private or not owner.storage_enabled else QWebEngineProfile(f'Cyber80Browser-{owner.window_number}',self)
         if not self.profile.isOffTheRecord():
             folder=owner.log_path.parent/'browser'/str(owner.window_number);self.profile.setPersistentStoragePath(str(folder/'profile'));self.profile.setCachePath(str(folder/'cache'))
+        self.profile.setHttpCacheMaximumSize(16*1024*1024)
         self.interceptor=Interceptor(self);self.profile.setUrlRequestInterceptor(self.interceptor);self.interceptor.candidate.connect(self.detect)
         self.profile.downloadRequested.connect(lambda request:self.manager.accept_native(request,self.private));self.cookies={};self.profile.cookieStore().cookieAdded.connect(self.cookie_added);self.profile.cookieStore().cookieRemoved.connect(self.cookie_removed);self.profile.cookieStore().loadAllCookies()
         self.media_epoch=0;self.media=[];self.seen=set();self.probes={};self.unknown_budget=30;self.history=[];self.bookmarks=[];self.preview=None
@@ -83,7 +84,7 @@ class BrowserWindow(QDialog):
         button=QPushButton('Proxy / akses jaringan');button.clicked.connect(self.proxy_settings);row.addWidget(button);row.addWidget(QLabel('Tidak ada filter konten aplikasi. Blokir ISP/akun tetap bergantung koneksi/proxy yang berfungsi.'));row.addStretch()
         self.tabs=QTabWidget();self.tabs.setTabsClosable(True);self.tabs.tabCloseRequested.connect(self.close_tab);self.tabs.currentChanged.connect(self.tab_changed)
         split=QSplitter(Qt.Vertical);split.addWidget(self.tabs);panel=QWidget();pbox=QVBoxLayout(panel);row=QHBoxLayout();pbox.addLayout(row)
-        row.addWidget(QLabel('Media terdeteksi • pilih media lalu Download'))
+        row.addWidget(QLabel('Media & file terdeteksi • pilih lalu Download'))
         for label,fn in [('Deteksi ulang',self.scan),('Download media',self.download_selected),('Putar di Cyber80',self.play_selected),('Download → Playlist',self.queue_playlist),('Kosongkan deteksi',self.clear_media)]:
             b=QPushButton(label);b.clicked.connect(fn);row.addWidget(b)
         self.media_table=QTableWidget(0,5);self.media_table.setHorizontalHeaderLabels(['Nama','Jenis/MIME','Ukuran','Kualitas / info','Situs']);self.media_table.setSelectionBehavior(QAbstractItemView.SelectRows);self.media_table.setEditTriggers(QAbstractItemView.NoEditTriggers);self.media_table.horizontalHeader().setStretchLastSection(True);pbox.addWidget(self.media_table)
@@ -191,7 +192,7 @@ class BrowserWindow(QDialog):
     def scan_result(self,rows):
         if not isinstance(rows,list):return
         for row in rows:
-            if isinstance(row,dict) and row.get('url','').startswith(('http://','https://')):self.detect({'url':row['url'],'known':row.get('kind') in ('video','audio','source'),'headers':{}})
+            if isinstance(row,dict) and row.get('url','').startswith(('http://','https://')):self.detect({'url':row['url'],'known':True,'allow_file':row.get('kind')=='file','headers':{}})
     def detect(self,candidate):
         try:url=checked_url(candidate['url'])
         except (KeyError,ValueError):return

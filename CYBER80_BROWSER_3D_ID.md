@@ -70,7 +70,7 @@ Pilih lokasi hasil sebelum proses. Terdapat pembatalan dan notifikasi serta tomb
 
 ## Bukti dan batas pengujian
 
-90 tes otomatis lokal mencakup suite sebelumnya ditambah HTTP server sungguhan untuk resume/paralel/fallback, redirect/cookie isolation, HTTP403, checksum, target berubah, disk penuh, HLS dan DASH nyata lalu remux FFmpeg, kontrol speed/scroll/zoom, trim range, stereo packing dan inference model MiDaS CPU asli. Subtes FFmpeg mencakup hard subtitle, video lirik, pemotongan video/audio dan alat sebelumnya.
+93 tes otomatis lokal mencakup suite sebelumnya ditambah HTTP server sungguhan untuk resume/paralel/fallback, redirect/cookie isolation, HTTP403, checksum, target berubah, disk penuh, HLS dan DASH nyata lalu remux FFmpeg, kontrol speed/scroll/zoom, trim range, stereo packing dan inference model MiDaS CPU asli. Subtes FFmpeg mencakup hard subtitle, video lirik, pemotongan video/audio dan alat sebelumnya.
 
 Laporan Windows di HASIL_UJI_WINDOWS.json mencatat tes EXE yang benar-benar dijalankan, termasuk browser lokal, deteksi MIME/DOM, pemutaran WebM/WAV, download HTTP/native Chromium, cutting visual, zoom/capture/reset, dan preview/ekspor stereo MiDaS. Hanya klaim PASS yang tercatat boleh dianggap teruji di build tersebut. Browser cloud Linux tanpa display GPU mengalami masalah renderer; hasil itu tidak dipromosikan sebagai pengujian browser sukses.
 
@@ -91,3 +91,11 @@ Pemeriksaan metadata API berhasil dan model gemini-3.5-flash-lite tersedia. Tran
 Satu respons attachment salah memberi label bahasa sumber `id` walau transkripnya Inggris. Prompt kini menegaskan bahwa kode bahasa harus milik suara asli. Pemeriksa teks offline meninjau label yang kosong/unknown/sama dengan bahasa target untuk teks cukup panjang dan keyakinan ≥98%; hasil tidak dijamin benar untuk semua bahasa, teks pendek atau campuran. Transkrip/terjemahan mentah dalam laporan tetap dipertahankan, tidak disamarkan sebagai output model yang sempurna.
 
 Fallback audio dapat dinonaktifkan di panel attachment. Saat aktif, kegagalan sementara 408/500/502/503/504 atau timeout pada jalur video dapat beralih ke audio dari video yang sama, model tetap sama. Kuota tambahan mungkin terpakai; tidak ada model/layanan berbayar otomatis. Fallback tidak dijalankan untuk 403 atau kuota 429. Uji fallback menggunakan server/response tiruan; uji langsung attachment terakhir berhasil pada jalur video sehingga fallback tidak diperlukan. Server Google tetap dapat sibuk, dan latensi tersebut bukan jaminan real-time/tanpa delay.
+
+## Paket lebih ringkas dan browser privat default
+
+Browser multimedia kini membuka profil privat secara default. Browser normal tetap tersedia sebagai pilihan terpisah. Batas cache browser 16 MiB; proses dan RAM tetap bergantung situs/tab/video yang dibuka. Mode privat tidak berarti anonim terhadap situs atau ISP.
+
+Mesin Chromium tetap dibundel agar deteksi media dan integrasi Download Manager tidak hilang. WebView2 belum dipakai dalam edisi ini. Paket diperkecil dengan membuang resource debug, locale selain Inggris/Indonesia, QML eksternal yang tidak dipakai frontend Widgets, serta GUI/skin/locale milik aplikasi VLC standalone. Decoder, demux, akses jaringan, FFmpeg, MiDaS/ONNX dan komponen browser produksi dipertahankan. OPTIMASI_PAKET.json merinci pengurangan ukuran sebelum ZIP.
+
+Panel mendeteksi tautan download dokumen/file umum selain video/audio. Content-Disposition attachment dan a[download] didukung; tombol Download Manager → Tambah URL tetap menerima file HTTP/HTTPS umum. Pengambilan URL tidak bergantung codec playback. Download native Chromium juga menerima file selain media. Pilihan kualitas HLS/DASH mengikuti subset yang didokumentasikan di atas; tidak ada jaminan semua situs, DRM, enkripsi, live, token kedaluwarsa atau akses login dapat diunduh.

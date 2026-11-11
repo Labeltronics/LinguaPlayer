@@ -12,7 +12,7 @@ class AdvancedAddons:
             try:self.wheel_seconds=max(1,min(300,int(self.settings.value('wheel_seconds',5))))
             except (ValueError,TypeError):pass
         menu=self.menuBar().addMenu('Cyber80 Hub')
-        for title,fn in [('Browser multimedia',self.open_browser),('Browser privat',lambda:self.open_browser(True)),('Download Manager',lambda:self.get_download_manager().show()),('Koleksi media',self.show_collection),('Cutting visual',self.open_cut_editor),('3D / 4D Cinema',self.show_tv),('Atur scroll seek',self.set_wheel_seconds)]:menu.addAction(title,fn)
+        for title,fn in [('Browser multimedia • Privat',lambda:self.open_browser(True)),('Browser normal (opsional)',lambda:self.open_browser(False)),('Download Manager',lambda:self.get_download_manager().show()),('Koleksi media',self.show_collection),('Cutting visual',self.open_cut_editor),('3D / 4D Cinema',self.show_tv),('Atur scroll seek',self.set_wheel_seconds)]:menu.addAction(title,fn)
         self.tv_dock=QDockWidget('3D TV / Depth AI / 4D cue preview',self);self.tv_dock.setObjectName('tv3d');panel=QWidget();box=QVBoxLayout(panel)
         row=QHBoxLayout();box.addLayout(row);self.tv_enable=QCheckBox('Aktifkan stereo TV (bukan anaglyph)');row.addWidget(self.tv_enable)
         self.tv_input=QComboBox()
@@ -63,7 +63,7 @@ class AdvancedAddons:
             from download_manager import DownloadManager
             self.download_manager=DownloadManager(self)
         return self.download_manager
-    def open_browser(self,private=False):
+    def open_browser(self,private=True):
         private=bool(private or self.private_session)
         if sys.platform=='win32':
             import ctypes,os,PySide6

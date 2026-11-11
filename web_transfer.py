@@ -1,7 +1,7 @@
 """HTTP transport and media inspection. Never log URLs, cookies or auth headers."""
 import re,urllib.request,urllib.error,urllib.parse,json,os,hashlib
 from pathlib import Path
-MEDIA_EXT={'.mp4','.m4v','.mkv','.webm','.mov','.avi','.flv','.ts','.mp3','.m4a','.aac','.wav','.flac','.ogg','.opus','.m3u8','.mpd','.mpeg','.3gp','.ogv'}
+MEDIA_EXT={'.mp4','.m4v','.mkv','.webm','.mov','.avi','.flv','.ts','.mp3','.m4a','.aac','.wav','.flac','.ogg','.opus','.m3u8','.mpd','.mpeg','.3gp','.ogv','.mpg','.wmv','.wma','.aiff','.aif','.ac3','.eac3','.m2ts','.mts','.vob','.mka','.m2v','.m4b','.asf','.amr','.ape','.alac'}
 SENSITIVE={'cookie','authorization','proxy-authorization','referer','origin'}
 def checked_url(url):
     p=urllib.parse.urlsplit(str(url))
@@ -39,7 +39,7 @@ def safe_filename(value,default='media.bin'):
     if value.split('.')[0].upper() in {'CON','PRN','AUX','NUL',*(f'COM{i}' for i in range(1,10)),*(f'LPT{i}' for i in range(1,10))}:value='_'+value
     return value
 
-def inspect_media(url,headers=None):
+def inspect_media(url,headers=None,allow_file=False):
     url=checked_url(url)
     try:response=open_http(url,headers,'HEAD')
     except urllib.error.HTTPError as exc:
@@ -54,7 +54,7 @@ def inspect_media(url,headers=None):
         if match:filename=next(v for v in match.groups() if v)
         suffix=Path(urllib.parse.urlsplit(final).path).suffix.lower()
         kind='hls' if 'mpegurl' in mime or suffix=='.m3u8' else 'dash' if 'dash+xml' in mime or suffix=='.mpd' else 'file'
-        return {'url':url,'name':safe_filename(filename),'mime':mime,'size':int(size) if size and size.isdigit() else None,'kind':kind,'media':mime.startswith(('video/','audio/')) or kind!='file' or suffix in MEDIA_EXT}
+        return {'url':url,'name':safe_filename(filename),'mime':mime,'size':int(size) if size and size.isdigit() else None,'kind':kind,'media':mime.startswith(('video/','audio/')) or kind!='file' or suffix in MEDIA_EXT or bool(allow_file) or cd.lower().startswith('attachment')}
 
 def atomic_json(path,value):
     import uuid
