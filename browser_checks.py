@@ -46,7 +46,7 @@ def run_browser_checks(owner):
                 assert native.is_file(),'Native browser download failed';assert native.read_bytes()==payload
             report['native_browser_download']='PASS';report['private_profile']=browser.profile.isOffTheRecord();report['browser_codecs']=javascript(view.page(),"JSON.stringify({webm:document.createElement('video').canPlayType('video/webm; codecs=\"vp8\"'),h264:document.createElement('video').canPlayType('video/mp4; codecs=\"avc1.42E01E\"'),mp3:document.createElement('audio').canPlayType('audio/mpeg')})")
         except Exception as exc:
-            diagnostics={'stage':stage,'title':view.title(),'url':view.url().toString(),'load_events':load_events,'status':browser.status.text(),'media_count':len(browser.media),'requests_in_flight':len(browser.probes),'passed':report}
+            diagnostics={'stage':stage,'title':view.title(),'url':view.url().toString(),'load_events':load_events,'status':browser.status.text(),'media_count':len(browser.media),'requests_in_flight':len(browser.probes),'queue':[{k:r.get(k) for k in ('status','received','total','message')} for r in owner.get_download_manager().records],'queue_timer':owner.get_download_manager().timer.isActive(),'queue_jobs':len(owner.get_download_manager().jobs),'passed':report}
             raise RuntimeError('Browser acceptance: '+json.dumps(diagnostics)+'; '+str(exc)) from exc
         finally:
             try:javascript(view.page(),"document.querySelectorAll('video,audio').forEach(e=>{e.pause();e.removeAttribute('src');e.load();});true")

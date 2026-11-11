@@ -99,7 +99,7 @@ class BrowserWindow(QDialog):
         view.titleChanged.connect(lambda title,v=view:self.tabs.setTabText(self.tabs.indexOf(v),title[:50] or 'Tab'));view.urlChanged.connect(lambda value,v=view:self.url_changed(v,value));view.loadFinished.connect(lambda ok:self.scan() if ok else None)
         self.tabs.addTab(view,'Tab');self.tabs.setCurrentWidget(view);view.setUrl(QUrl(url));return view
     def loading_info(self,info):
-        if info.errorCode():
+        if info.status().name == 'LoadFailedStatus':
             message=re.sub(r'https?://\S+','[alamat]',info.errorString())
             self.status.setText(f'Halaman gagal, kode {info.errorCode()}: {message[:240]}')
     def proxy_authentication(self,url,authenticator,host):

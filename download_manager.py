@@ -37,7 +37,7 @@ class DownloadManager(QDialog):
         rid=uuid.uuid4().hex;record={'id':rid,'target':target,'name':Path(target).name,'status':'Queued','kind':kind,'quality':quality,'connections':self.connections.value(),'priority':0,'private':bool(private or self.owner.private_session),'received':0,'total':0,'validator':'','target_stamp':target_stamp(target)}
         self.records.append(record);self.urls[rid]=url;self.headers[rid]=dict(headers or {});
         if not record['private']:self.save_url(rid,url)
-        self.save();self.refresh();self.show();return record
+        self.save();self.refresh();self.show();self.pump();return record
     def save_url(self,rid,url):
         if self.persist and os.name=='nt':
             try:save_key('Download-'+rid,url)
