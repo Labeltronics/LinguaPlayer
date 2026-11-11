@@ -29,15 +29,15 @@ def target_stamp(path):
 class DownloadJob(QThread):
     update=Signal(object);done=Signal(str,str)
     def __init__(self,record,url,headers=None,limiter=None):
-        super().__init__();self.record=dict(record);self.url=checked_url(url);self.headers=dict(headers or {});self.limiter=limiter or RateLimiter();self.event=threading.Event();self.mode='Paused';self.proc=None;self.last_emit=0.;self.started=0.;self.initial=0;self.received=0
+        super().__init__();self.record=dict(record);self.url=checked_url(url);self.headers=dict(headers or {});self.limiter=limiter or RateLimiter();self.stop_event=threading.Event();self.mode='Paused';self.proc=None;self.last_emit=0.;self.started=0.;self.initial=0;self.received=0
         self.target=Path(record['target']);self.part=self.target.with_name(self.target.name+'.'+record['id']+'.part');self.directory=self.target.with_name(self.target.name+'.'+record['id']+'.segments')
     def stop(self,cancel=False):
-        self.mode='Cancelled' if cancel else 'Paused';self.event.set()
+        self.mode='Cancelled' if cancel else 'Paused';self.stop_event.set()
         if self.proc:
             try:self.proc.kill()
             except OSError:pass
     def check(self):
-        if self.event.is_set():raise Stopped()
+        if self.stop_event.is_set():raise Stopped()
     def report(self,received,total=0,message='',force=False):
         if not force and time.monotonic()-self.last_emit<.15:return
         self.last_emit=time.monotonic();elapsed=max(.001,time.monotonic()-self.started);speed=max(0,received-self.initial)/elapsed
@@ -50,7 +50,7 @@ class DownloadJob(QThread):
             while True:
                 self.check();data=response.read(64*1024)
                 if not data:break
-                self.disk_check();output.write(data);count+=len(data);self.limiter.wait(len(data),self.event);self.report(count,total)
+                self.disk_check();output.write(data);count+=len(data);self.limiter.wait(len(data),self.stop_event);self.report(count,total)
         return count
     def single_file(self):
         for attempt in range(3):
@@ -84,7 +84,7 @@ class DownloadJob(QThread):
             except (urllib.error.URLError,TimeoutError,socket.timeout,ConnectionError) as exc:
                 if isinstance(exc,urllib.error.HTTPError) and exc.code not in (408,429,500,502,503,504):raise
                 if attempt==2:raise
-                if self.event.wait(attempt+1):raise Stopped()
+                if self.stop_event.wait(attempt+1):raise Stopped()
     def parallel_file(self):
         # Parallel mode needs a strong validator and an independently confirmed byte range.
         with open_http(self.url,self.headers,'HEAD') as response:
@@ -110,7 +110,7 @@ class DownloadJob(QThread):
                     while True:
                         self.check();data=response.read(min(64*1024,b-a+1-have))
                         if not data:break
-                        self.disk_check();output.write(data);have+=len(data);self.limiter.wait(len(data),self.event)
+                        self.disk_check();output.write(data);have+=len(data);self.limiter.wait(len(data),self.stop_event)
                         with lock:progress[i]=have;self.report(sum(progress.values()),total,'Koneksi paralel tervalidasi')
                 if have!=b-a+1:raise ConnectionError('Segmen paralel terputus.')
         with ThreadPoolExecutor(max_workers=count) as executor:
@@ -131,7 +131,7 @@ class DownloadJob(QThread):
                     while True:
                         self.check();data=response.read(64*1024)
                         if not data:break
-                        self.disk_check();output.write(data);count+=len(data);self.received+=len(data);self.limiter.wait(len(data),self.event);self.report(self.received,0,'Mengunduh segmen stream')
+                        self.disk_check();output.write(data);count+=len(data);self.received+=len(data);self.limiter.wait(len(data),self.stop_event);self.report(self.received,0,'Mengunduh segmen stream')
                 if expected and count!=expected:raise ConnectionError('Segmen stream tidak lengkap.')
             os.replace(temporary,target)
         finally:temporary.unlink(missing_ok=True)
@@ -188,7 +188,7 @@ class DownloadJob(QThread):
         with tempfile.TemporaryFile() as errors:
             self.proc=subprocess.Popen(command,stdout=subprocess.DEVNULL,stderr=errors,**flags)
             while self.proc.poll() is None:
-                if self.event.wait(.1):self.proc.kill();self.proc.wait();raise Stopped()
+                if self.stop_event.wait(.1):self.proc.kill();self.proc.wait();raise Stopped()
             if self.proc.returncode:
                 errors.seek(0);self.ffmpeg_error=errors.read().decode(errors='replace')[-2000:]
                 raise ValueError('FFmpeg tidak dapat menggabungkan stream/codec ini. Segmen dipertahankan untuk dicoba lagi.')

@@ -50,6 +50,27 @@ class ControlsTests(unittest.TestCase):
                 manager.jobs.clear()
         finally:manager.jobs.clear();w.close();q.processEvents()
     @patch.object(app.vlc,'Instance',side_effect=fake_engine)
+    def test_real_queue_worker_delivers_completion_and_releases(self,factory):
+        import threading,time
+        from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
+        payload=b'Cyber80 queue fixture'*4096
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200);self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload)
+            def log_message(self,*args):pass
+        http=ThreadingHTTPServer(('127.0.0.1',0),Handler);thread=threading.Thread(target=http.serve_forever,daemon=True);thread.start()
+        w=app.Window();manager=w.get_download_manager()
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                target=Path(d)/'queued.bin'
+                record=manager.add(f'http://127.0.0.1:{http.server_port}/file','queued.bin',target=target,private=True)
+                deadline=time.monotonic()+10
+                while (record['status'] not in ('Completed','Failed') or manager.jobs) and time.monotonic()<deadline:q.processEvents();time.sleep(.01)
+                self.assertEqual(record['status'],'Completed',record);self.assertEqual(target.read_bytes(),payload);self.assertFalse(manager.jobs)
+        finally:
+            for job in list(manager.jobs.values()):job.stop();job.wait(2000)
+            q.processEvents();w.close();http.shutdown();http.server_close();thread.join()
+    @patch.object(app.vlc,'Instance',side_effect=fake_engine)
     def test_snapshot_fallback_and_source_protection(self,factory):
         import subprocess,time,imageio_ffmpeg
         w=app.Window()
