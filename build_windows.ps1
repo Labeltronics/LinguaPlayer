@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 if (-not [Environment]::Is64BitProcess) { throw 'Gunakan Python/PowerShell 64-bit.' }
-py -3 -m venv .venv
+python -m venv .venv
 if ($LASTEXITCODE -ne 0) { throw 'Pasang Python 3.11/3.12 64-bit.' }
 $Python = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 & $Python -m pip install -r requirements.txt
@@ -18,3 +18,9 @@ Copy-Item LICENSE dist\LinguaPlayer\
 Copy-Item README_ID.md dist\LinguaPlayer\
 Copy-Item THIRD_PARTY.md dist\LinguaPlayer\
 Write-Host 'Selesai: dist\LinguaPlayer\LinguaPlayer.exe. Bagikan seluruh folder, bukan EXE saja.'
+
+$PluginRoot = Join-Path $PSScriptRoot 'dist\LinguaPlayer\_internal\vlc\plugins'
+$Plugins = Get-ChildItem $PluginRoot -Recurse -Filter *.dll
+if ($Plugins.Count -lt 100) { throw 'Plugin VLC tidak lengkap.' }
+$Plugins | ForEach-Object { $_.FullName.Substring($PluginRoot.Length + 1) } | Sort-Object | Set-Content dist\LinguaPlayer\CODEC_PLUGINS.txt
+Write-Host "Bundled VLC plugin DLLs: $($Plugins.Count)"

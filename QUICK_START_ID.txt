@@ -18,3 +18,14 @@ Tidak perlu memasang Python atau VLC terpisah: runtime VLC dan FFmpeg dibundel.
 API key tidak ditanamkan pada EXE dan tidak masuk repository GitHub.
 Jangan jalankan dari dalam ZIP; ekstrak dahulu. Jangan pindahkan EXE sendirian.
 EXE belum memiliki tanda tangan penerbit/code signing.
+
+PERBAIKAN VIDEO DAN PICTURE-IN-PICTURE
+- Mode bawaan Windows: Kompatibel (CPU / GDI), untuk menghindari masalah layar hitam GPU.
+- Jika perlu, pilih Otomatis (GPU) atau Direct3D11 melalui menu mode tampilan.
+- Tombol PiP membuka jendela kecil yang selalu di atas; ukurannya bisa diubah dan dipindah lewat title bar.
+- Play/Pause, subtitle, serta tombol Kembali ke pemutar tersedia dalam PiP.
+- Menutup PiP mengembalikan video ke pemutar utama; pause dan posisi dipertahankan.
+- Log video membuka log lokal untuk diagnosis. Log dapat memuat nama/lokasi video, tetapi tidak API key.
+- Seluruh plugin dalam distribusi VLC resmi dibundel. Daftarnya di CODEC_PLUGINS.txt.
+- Format umum: FLV, TS/MTS/M2TS, MP4, AVI, 3GP/3G2, MKV, MOV, WebM, WMV, MPEG, VOB, OGV, M4V.
+- Dukungan codec mengikuti VLC yang dibundel; file rusak, DRM atau codec tertentu tetap bisa gagal.

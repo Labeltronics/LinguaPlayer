@@ -51,3 +51,9 @@ Jalankan `python -m unittest discover -s tests -v`. Untuk penerimaan Windows, ve
 - https://docs.cloud.google.com/translate/docs/reference/rest/v2/translate
 - https://docs.cloud.google.com/translate/docs/authentication
 - Lihat THIRD_PARTY.md untuk alat sumber terbuka dan lisensi.
+
+## Perbaikan layar hitam dan PiP
+
+Windows sekarang memakai output software CPU/GDI, native video handle diikat ulang setelah jendela ditampilkan/dipindahkan, serta jalur pencarian DLL codec diarahkan ke VLC yang dibundel. Ini perbaikan untuk kemungkinan masalah render dan pemuatan codec; penyebab pada komputer pengguna belum direproduksi langsung. Pilihan Otomatis/GPU dan Direct3D11 tersedia. Tombol Log video membuka log lokal. PiP memindahkan permukaan video yang sama ke jendela always-on-top dan mempertahankan posisi/pause saat kembali. Semua DLL plugin VLC disertakan dan dicantumkan pada CODEC_PLUGINS.txt.
+
+Build baru wajib melalui tes pemutaran EXE pada video sintetis FLV, TS, MP4, AVI, 3GP, MKV, MOV, dan WebM. Tes memeriksa frame decoded/displayed dan transisi PiP menggunakan VLC nyata, setelah instalasi VLC sistem dinonaktifkan agar tidak menutupi plugin bundel yang hilang. Tes ini bukan pemeriksaan visual pada komputer pengguna dan bukan jaminan semua file dengan ekstensi tersebut dapat diputar.

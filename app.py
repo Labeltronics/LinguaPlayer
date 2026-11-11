@@ -1,4 +1,4 @@
-import os, sys, tempfile, subprocess, wave, json
+import os, sys, tempfile, subprocess, wave, json, time
 from pathlib import Path
 # Load bundled VLC before importing python-vlc.
 ROOT=Path(getattr(sys,'_MEIPASS',Path(__file__).parent))
@@ -10,9 +10,10 @@ if vlcdir.is_dir():
     os.environ['PATH']=str(vlcdir)+os.pathsep+os.environ.get('PATH','')
     if hasattr(os,'add_dll_directory'): DLL_HANDLE=os.add_dll_directory(str(vlcdir))
 import vlc, imageio_ffmpeg
-from PySide6.QtCore import Qt, QThread, Signal, QTimer
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,
-    QFileDialog,QLabel,QLineEdit,QComboBox,QSlider,QTableWidget,QTableWidgetItem,QMessageBox,QSpinBox)
+    QFileDialog,QLabel,QLineEdit,QComboBox,QSlider,QTableWidget,QTableWidgetItem,QMessageBox,QSpinBox,QFrame,QDialog)
 from core import Cue, transcribe, srt
 from credentials import save_key, load_key, delete_key
 
@@ -52,24 +53,51 @@ class Job(QThread):
             self.result.emit(cues)
         except Exception as e: self.failed.emit(str(e))
 
+class PictureWindow(QDialog):
+    returning=Signal()
+    def __init__(self,owner):
+        super().__init__(None,Qt.Window|Qt.WindowStaysOnTopHint)
+        self.setWindowTitle('LinguaPlayer • Picture in Picture');self.resize(520,380)
+        self.setMinimumSize(300,230)
+        self.box=QVBoxLayout(self);self.box.setContentsMargins(4,4,4,4)
+        self.caption=QLabel();self.caption.setWordWrap(True);self.caption.setAlignment(Qt.AlignCenter);self.caption.setTextFormat(Qt.PlainText)
+        self.caption.setStyleSheet('color:#ffe18a;font-size:16px;padding:5px;background:#111827')
+        controls=QHBoxLayout();self.box.addWidget(self.caption);self.box.addLayout(controls)
+        owner.button(controls,'▶ / Pause',owner.play)
+        owner.button(controls,'Kembali ke pemutar',owner.leave_pip)
+        self.setStyleSheet('QDialog{background:black} QPushButton{padding:7px}')
+    def closeEvent(self,event):
+        event.ignore();self.returning.emit()
+
 class Window(QMainWindow):
     def __init__(self):
         super().__init__(); self.setWindowTitle('LinguaPlayer • Video & AI Subtitle'); self.resize(1200,850)
         self.path=''; self.job=None; self.cues=[];self.coverage=0.;self.processing=False;self.buffering=False;self.want_play=False
-        self.engine=vlc.Instance('--no-video-title-show'); self.player=self.engine.media_player_new()
+        self.pip=None;self.pending_seek=None;self.pending_pause=False;self.closing=False;self.playback_error_reported=False
+        self.log_path=Path(os.getenv('LOCALAPPDATA',tempfile.gettempdir()))/'LinguaPlayer'/'playback.log'
+        self.log_path.parent.mkdir(parents=True,exist_ok=True)
+        self.engine=self.make_engine(0);self.player=self.engine.media_player_new()
         root=QWidget(); self.setCentralWidget(root); layout=QVBoxLayout(root)
         title=QLabel('LinguaPlayer  |  Video • Speech to Text • Terjemahan'); title.setStyleSheet('font-size:22px;font-weight:bold'); layout.addWidget(title)
-        self.video=QWidget(); self.video.setMinimumHeight(280); self.video.setStyleSheet('background:black'); layout.addWidget(self.video,1)
-        if sys.platform=='win32': self.player.set_hwnd(int(self.video.winId()))
-        elif sys.platform=='darwin': self.player.set_nsobject(int(self.video.winId()))
-        else: self.player.set_xwindow(int(self.video.winId()))
+        self.video_host=QWidget();self.host_layout=QVBoxLayout(self.video_host);self.host_layout.setContentsMargins(0,0,0,0)
+        self.video=QFrame();self.video.setMinimumSize(160,160)
+        self.video.setAttribute(Qt.WA_NativeWindow,True)
+        self.video.setAttribute(Qt.WA_DontCreateNativeAncestors,True)
+        self.video.setAttribute(Qt.WA_NoSystemBackground,True)
+        self.video.setAutoFillBackground(False)
+        self.host_layout.addWidget(self.video);layout.addWidget(self.video_host,1)
+        self.bind_video()
         self.subtitle=QLabel('Buka video untuk mulai'); self.subtitle.setWordWrap(True); self.subtitle.setAlignment(Qt.AlignCenter); self.subtitle.setTextFormat(Qt.PlainText)
         self.subtitle.setStyleSheet('font-size:20px;color:#ffe18a;background:#131b2c;padding:10px'); layout.addWidget(self.subtitle)
         row=QHBoxLayout(); layout.addLayout(row)
         self.open=self.button(row,'Buka video',self.open_video); self.button(row,'▶ / Pause',self.play)
-        self.button(row,'Stop',self.stop)
+        self.button(row,'Stop',self.stop);self.pip_button=self.button(row,'PiP',self.toggle_pip)
+        self.renderer=QComboBox();self.renderer.addItems(['Kompatibel (CPU / GDI)','Otomatis (GPU)','Direct3D11'])
+        if sys.platform!='win32':self.renderer.setCurrentIndex(1)
+        self.renderer.currentIndexChanged.connect(self.change_renderer);row.addWidget(self.renderer)
+        self.button(row,'Log video',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.log_path))))
         self.seek=QSlider(Qt.Horizontal); self.seek.setRange(0,1000); self.seek.sliderReleased.connect(lambda:self.player.set_position(self.seek.value()/1000)); row.addWidget(self.seek,1)
-        volume=QSlider(Qt.Horizontal); volume.setRange(0,100); volume.setValue(80); volume.setMaximumWidth(100); volume.valueChanged.connect(self.player.audio_set_volume); row.addWidget(QLabel('Volume'));row.addWidget(volume);self.player.audio_set_volume(80)
+        volume=QSlider(Qt.Horizontal); volume.setRange(0,100); volume.setValue(80); volume.setMaximumWidth(100); volume.valueChanged.connect(lambda value:self.player.audio_set_volume(value)); row.addWidget(QLabel('Volume'));row.addWidget(volume);self.player.audio_set_volume(80);self.volume=volume
         row=QHBoxLayout();layout.addLayout(row)
         self.key=QLineEdit(os.getenv('GEMINI_API_KEY',''));self.key.setEchoMode(QLineEdit.Password);self.key.setPlaceholderText('Gemini API key');row.addWidget(self.key)
         self.model=QLineEdit('gemini-3.8-flash');self.model.setMaximumWidth(170);row.addWidget(self.model)
@@ -93,7 +121,70 @@ class Window(QMainWindow):
             self.key.setText(load_key('Gemini') or self.key.text());self.google.setText(load_key('GoogleTranslate') or self.google.text())
         except Exception:pass
         self.timer=QTimer(self);self.timer.timeout.connect(self.tick);self.timer.start(100)
+        QTimer.singleShot(0,self.bind_video)
         self.setStyleSheet('QMainWindow,QWidget{background:#111827;color:#e5e7eb} QPushButton,QLineEdit,QComboBox,QSpinBox{padding:7px;background:#25334b;border:1px solid #41516c;border-radius:5px} QTableWidget{background:#172237} QPushButton:disabled{color:#6b7280}')
+    def make_engine(self,mode):
+        options=['--ignore-config','--no-video-title-show','--no-osd','--video','--audio',
+                 '--no-plugins-cache','--file-logging','--logfile='+str(self.log_path),'--verbose=2']
+        if '--self-test' in sys.argv:options+=['--aout=dummy']
+        if sys.platform=='win32':
+            if vlcdir.is_dir():
+                import ctypes
+                # Keep VLC decoder dependencies ahead of unrelated Qt/PyInstaller DLLs.
+                ctypes.windll.kernel32.SetDllDirectoryW(str(vlcdir))
+            if mode==0:options+=['--avcodec-hw=none','--vout=wingdi']
+            elif mode==2:options+=['--avcodec-hw=none','--vout=direct3d11']
+        engine=vlc.Instance(*options)
+        if engine is None:raise RuntimeError('VLC tidak dapat memuat plugin codec yang dibundel.')
+        return engine
+    def bind_video(self):
+        handle=int(self.video.winId())
+        if sys.platform=='win32':self.player.set_hwnd(handle)
+        elif sys.platform=='darwin':self.player.set_nsobject(handle)
+        else:self.player.set_xwindow(handle)
+    def change_renderer(self,index):
+        position=max(0,self.player.get_time());state=self.player.get_state()
+        active=state in (vlc.State.Playing,vlc.State.Paused,vlc.State.Buffering)
+        paused=state==vlc.State.Paused
+        self.player.stop();self.player.release();self.engine.release()
+        self.engine=self.make_engine(index);self.player=self.engine.media_player_new();self.bind_video()
+        self.player.audio_set_volume(self.volume.value())
+        if self.path:
+            self.player.set_media(self.engine.media_new_path(self.path))
+            if active:self.pending_seek=position;self.pending_pause=paused;self.player.play()
+        self.status.setText('Mode tampilan: '+self.renderer.currentText())
+    def restart_surface(self,position,active,paused):
+        if self.closing:return
+        self.bind_video()
+        if active:
+            self.pending_seek=position;self.pending_pause=paused;self.player.play()
+    def toggle_pip(self):
+        if self.pip:return self.leave_pip()
+        position=max(0,self.player.get_time());state=self.player.get_state()
+        active=state in (vlc.State.Playing,vlc.State.Paused,vlc.State.Buffering);paused=state==vlc.State.Paused
+        if active:self.player.stop()
+        popup=PictureWindow(self);self.pip=popup;popup.returning.connect(self.leave_pip)
+        self.host_layout.removeWidget(self.video);self.video.setMinimumSize(160,90)
+        popup.box.insertWidget(0,self.video,1);popup.caption.setText(self.subtitle.text());popup.show();self.video.show()
+        self.pip_button.setText('Kembali dari PiP')
+        QTimer.singleShot(0,lambda:self.restart_surface(position,active,paused))
+    def leave_pip(self):
+        if self.pip is None:return
+        position=max(0,self.player.get_time());state=self.player.get_state()
+        active=not self.closing and state in (vlc.State.Playing,vlc.State.Paused,vlc.State.Buffering)
+        paused=state==vlc.State.Paused
+        self.player.stop()
+        popup=self.pip;self.pip=None;popup.box.removeWidget(self.video)
+        self.video.setMinimumSize(160,160);self.host_layout.addWidget(self.video);self.video.show()
+        popup.hide();popup.deleteLater();self.pip_button.setText('PiP')
+        if not self.closing:QTimer.singleShot(0,lambda:self.restart_surface(position,active,paused))
+    def open_path(self,path):
+        path=Path(path).resolve()
+        if not path.is_file():raise ValueError('File video tidak ditemukan.')
+        self.player.stop();self.path=str(path);self.pending_seek=None;self.pending_pause=False;self.playback_error_reported=False
+        self.bind_video();self.player.set_media(self.engine.media_new_path(self.path))
+        if self.player.play()==-1:raise RuntimeError('VLC gagal memulai video. Coba mode Kompatibel (CPU / GDI).')
+        self.fill([]);self.status.setText(path.name)
     def button(self,row,label,fn):
         b=QPushButton(label);b.clicked.connect(fn);row.addWidget(b);return b
     def save_keys(self):
@@ -111,9 +202,10 @@ class Window(QMainWindow):
         except Exception as e:self.error(str(e))
     def error(self,message): QMessageBox.warning(self,'LinguaPlayer',message)
     def open_video(self):
-        p,_=QFileDialog.getOpenFileName(self,'Pilih video','','Semua file (*.*)')
+        p,_=QFileDialog.getOpenFileName(self,'Pilih video','','Video (*.mp4 *.mkv *.avi *.flv *.ts *.mts *.m2ts *.3gp *.3g2 *.mov *.webm *.wmv *.mpg *.mpeg *.vob *.ogv *.m4v);;Semua file (*.*)')
         if p:
-            self.path=p;self.player.set_media(self.engine.media_new_path(p));self.player.play();self.fill([]);self.status.setText(Path(p).name)
+            try:self.open_path(p)
+            except Exception as e:self.error(str(e))
     def stop(self):
         self.want_play=False;self.player.stop()
     def play(self):
@@ -164,6 +256,10 @@ class Window(QMainWindow):
             self.error('Waktu harus angka positif dan akhir lebih besar dari mulai.');self.fill(self.cues)
     def jump(self,row,col): self.player.set_time(int(self.cues[row].start*1000))
     def tick(self):
+        if self.pending_seek is not None and self.player.get_state()==vlc.State.Playing:
+            self.player.set_time(self.pending_seek);self.pending_seek=None
+            if self.pending_pause:self.player.set_pause(1)
+            self.pending_pause=False
         if not self.seek.isSliderDown():self.seek.setValue(max(0,int(self.player.get_position()*1000)))
         if self.processing and self.want_play and self.player.get_time()/1000 >= self.coverage-.15:
             self.player.set_pause(1);self.buffering=True
@@ -171,7 +267,10 @@ class Window(QMainWindow):
         t=(self.player.get_time()-self.offset.value())/1000
         cue=next((c for c in self.cues if c.start<=t<c.end),None)
         self.subtitle.setText(('\n'.join(filter(None,[cue.source,cue.target])) if self.mode.currentIndex()==0 else (cue.target or cue.source) if self.mode.currentIndex()==1 else cue.source) if cue else '')
-        if self.player.get_state()==vlc.State.Error:self.status.setText('VLC gagal memutar video. Periksa codec, DRM, atau kerusakan file.')
+        if self.pip is not None:self.pip.caption.setText(self.subtitle.text())
+        if self.player.get_state()==vlc.State.Error and not self.playback_error_reported:
+            self.playback_error_reported=True
+            self.status.setText('VLC gagal memutar video. Pilih mode Kompatibel (CPU / GDI) atau lihat Log video. File rusak/DRM mungkin tidak didukung.')
     def import_srt(self):
         p,_=QFileDialog.getOpenFileName(self,'Buka SRT offline','','SRT (*.srt)')
         if p:
@@ -201,10 +300,11 @@ class Window(QMainWindow):
                 from core import validate
                 data=json.loads(Path(p).read_text(encoding='utf-8'));cues=validate(data['cues'],1e12)
                 if not Path(data['video']).is_file():raise ValueError('Video asli tidak ditemukan. Lokasi video harus tetap sama.')
-                self.path=data['video'];self.player.set_media(self.engine.media_new_path(self.path));self.fill(cues);self.offset.setValue(int(data.get('offset_ms',0)));self.player.play()
+                self.open_path(data['video']);self.fill(cues);self.offset.setValue(int(data.get('offset_ms',0)))
             except Exception as e:self.error(str(e))
     def closeEvent(self,event):
         if self.job and self.job.isRunning():self.cancel_job();self.error('Tunggu pembatalan selesai sebelum menutup aplikasi.');event.ignore();return
+        self.closing=True;self.leave_pip();self.timer.stop()
         self.player.stop();self.player.release();self.engine.release();event.accept()
 
 if __name__=='__main__':
@@ -222,7 +322,9 @@ if __name__=='__main__':
                         save_key(test_name,'temporary-test-value');assert load_key(test_name)=='temporary-test-value'
                     finally:delete_key(test_name)
                     assert load_key(test_name)==''
-                    output.write_text(json.dumps({'credential_manager':'PASS','qt_window':'PASS','vlc_version':vlc.libvlc_get_version().decode(),'ffmpeg':'PASS'}),encoding='utf-8')
+                    from playback_checks import run_playback_checks
+                    playback=run_playback_checks(w)
+                    output.write_text(json.dumps({'playback':playback,'credential_manager':'PASS','qt_window':'PASS','vlc_version':vlc.libvlc_get_version().decode(),'ffmpeg':'PASS'}),encoding='utf-8')
                     w.close();app.exit(0)
                 except Exception as e:
                     output.write_text(json.dumps({'error':str(e)}),encoding='utf-8');app.exit(1)

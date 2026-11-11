@@ -20,11 +20,18 @@ jobs:
       - name: Build and test
         shell: pwsh
         run: ./build_windows.ps1
+      - name: Disable system VLC to verify portable codecs
+        shell: pwsh
+        run: Rename-Item "${env:ProgramFiles}\VideoLAN\VLC" "VLC-system-disabled"
       - name: Test packaged EXE startup
         shell: pwsh
         run: |
           $p = Start-Process dist\LinguaPlayer\LinguaPlayer.exe -ArgumentList '--self-test', "$env:RUNNER_TEMP\lingua-test.json" -PassThru -Wait
-          if ($p.ExitCode -ne 0) { throw 'EXE self-test failed' }
+          if ($p.ExitCode -ne 0) {
+            Get-Content "$env:RUNNER_TEMP\lingua-test.json" -ErrorAction SilentlyContinue
+            Get-Content "$env:LOCALAPPDATA\LinguaPlayer\playback.log" -Tail 100 -ErrorAction SilentlyContinue
+            throw 'EXE playback self-test failed'
+          }
           Get-Content "$env:RUNNER_TEMP\lingua-test.json"
       - uses: actions/upload-artifact@v4
         with:

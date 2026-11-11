@@ -40,3 +40,15 @@ class PlayerTests(unittest.TestCase):
             self.assertFalse(errors);self.assertEqual(len(results),1)
             self.assertAlmostEqual(chunks[0],10,places=1);self.assertAlmostEqual(chunks[1],12,places=1)
             self.assertEqual(results[0][1].start,10)
+
+    def test_pip_moves_native_surface_and_restores(self):
+        with patch.object(app.vlc,'Instance',return_value=MagicMock()):
+            w=app.Window();w.player.get_time.return_value=1000;w.player.get_state.return_value=app.vlc.State.Stopped
+            try:
+                w.toggle_pip();q.processEvents()
+                self.assertIsNotNone(w.pip);self.assertEqual(w.video.parentWidget(),w.pip)
+                w.fill([Cue(0,2,'Original','Subtitle Indonesia')]);w.player.get_position.return_value=0.;w.tick()
+                self.assertEqual(w.pip.caption.text(),'Subtitle Indonesia')
+                w.leave_pip();q.processEvents()
+                self.assertIsNone(w.pip);self.assertEqual(w.video.parentWidget(),w.video_host)
+            finally:w.close();q.processEvents()
