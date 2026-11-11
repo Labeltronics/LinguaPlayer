@@ -297,6 +297,7 @@ class ModernTools(AdvancedAddons):
 
     def setup_background_controls(self):
         row=QHBoxLayout();self.ai_panel.layout().addLayout(row)
+        self.attachment_fallback=QCheckBox('Fallback audio jika video sibuk/timeout (kuota tambahan, model sama)');self.attachment_fallback.setChecked(True);self.ai_panel.layout().addWidget(self.attachment_fallback)
         self.attachment_proxy=QCheckBox('Proxy MP4 720p (file besar/format lain/track pilihan)');row.addWidget(self.attachment_proxy)
         self.attachment_start=QPushButton('Attachment video → subtitle di latar belakang');self.attachment_start.clicked.connect(self.start_background_subtitles);row.addWidget(self.attachment_start)
         self.attachment_cancel=QPushButton('Batalkan attachment');self.attachment_cancel.clicked.connect(self.cancel_background);self.attachment_cancel.setEnabled(False);row.addWidget(self.attachment_cancel)
@@ -320,7 +321,7 @@ class ModernTools(AdvancedAddons):
         target,_=QFileDialog.getSaveFileName(self,'Simpan subtitle hasil attachment',str(Path(source).with_suffix(''))+'.Cyber80.srt','SRT (*.srt)')
         if not target:return
         if Path(target).resolve()==Path(source).resolve():self.error('Hasil subtitle tidak boleh menimpa video.');return
-        self.background_job=BackgroundSubtitleJob(source,target,key,self.model.text().strip(),lang,self.glossary.text().strip(),proxy,self.ai_stream.value(),self.storage_enabled)
+        self.background_job=BackgroundSubtitleJob(source,target,key,self.model.text().strip(),lang,self.glossary.text().strip(),proxy,self.ai_stream.value(),self.storage_enabled,self.attachment_fallback.isChecked())
         self.background_job.progress.connect(self.attachment_status.setText);self.background_job.completed.connect(self.background_complete);self.background_job.failed.connect(self.background_failed);self.background_job.finished.connect(self.background_finished)
         self.attachment_start.setEnabled(False);self.attachment_cancel.setEnabled(True)
         if self.tray is None and QSystemTrayIcon.isSystemTrayAvailable():

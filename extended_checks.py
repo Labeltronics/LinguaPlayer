@@ -9,7 +9,13 @@ from depth_stereo import StereoExport
 from media_jobs import UtilityJob
 
 def run_extended_checks(window,root,long_clip):
-    root=Path(root);report={};window.open_path(str(long_clip));wait_for(lambda:picture_stats(window)['displayed']>=3)
+    root=Path(root);report={}
+    from language_check import check_source_languages
+    from core import Cue
+    check=check_source_languages([Cue(0,4,'Hello world welcome to Cyber80player this is a subtitle test','Halo dunia','id')],'id')
+    if check[0].language!='en':raise RuntimeError('Bundled source language verification failed')
+    report['source_language_label_check']='PASS'
+    window.open_path(str(long_clip));wait_for(lambda:picture_stats(window)['displayed']>=3)
     for rate in (.1,10.):
         window.speed_box.setValue(rate)
         if abs(window.player.get_rate()-rate)>.05:raise RuntimeError('Extended speed not applied')

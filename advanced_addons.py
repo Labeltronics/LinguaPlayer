@@ -65,6 +65,13 @@ class AdvancedAddons:
         return self.download_manager
     def open_browser(self,private=False):
         private=bool(private or self.private_session)
+        if sys.platform=='win32':
+            import ctypes,os,PySide6
+            qt=Path(PySide6.__file__).parent
+            candidates=[qt,qt/'Qt'/'bin']
+            os.environ['PATH']=os.pathsep.join(str(p) for p in candidates if p.is_dir())+os.pathsep+os.environ.get('PATH','')
+            # VLC's legacy DLL directory must not be inherited by Chromium helpers.
+            ctypes.windll.kernel32.SetDllDirectoryW(str(qt))
         from web_browser import BrowserWindow
         browser=next((b for b in self.browsers if b.private==private),None)
         if browser is None:browser=BrowserWindow(self,private or self.private_session);self.browsers.append(browser)

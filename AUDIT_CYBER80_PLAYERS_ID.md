@@ -1,3 +1,5 @@
+Lihat **CYBER80_BROWSER_3D_ID.md** dan **GEMINI_LIVE_TEST_REPORT.json** untuk pembaruan terbaru. Bagian berikut adalah catatan audit versi sebelumnya.
+
 # Status audit terbaru
 
 Lihat **PEMBARUAN_CYBER80_ID.md** untuk fitur baru, hasil uji dan kekurangan yang masih terbuka. Tabel di bawah adalah audit versi sebelumnya; beberapa batasan (skin, track AI, SQLite, kompresor, attachment) sudah berubah pada pembaruan ini.

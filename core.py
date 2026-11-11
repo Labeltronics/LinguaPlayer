@@ -105,7 +105,7 @@ def transcribe(audio, key, model, language, duration, offset, google_key='', can
     if not re.fullmatch(r'[A-Za-z0-9_.-]+',model): raise ValueError('Nama model tidak valid')
     prompt = ('Transcribe the actual speech, detecting the source language. Do not invent speech in silence/music. '
               'Return only a JSON array of subtitle cues, each with numeric start and end in seconds relative to this audio, '
-              'source (original transcript), target (translation), and language (detected source language ISO code). Short readable cues. '
+              'source (faithful original transcript with punctuation), target (translation), and language (ISO code of the ORIGINAL SPOKEN language, NEVER the target translation language). Short readable cues. '
               f'Audio duration {duration:.3f} seconds. Translate to {language}. Use correct spelling, capitalization and punctuation. '
               + ('Leave target empty; another translator handles translation.' if google_key else 'Preserve meaning and proper names.'))
     prompt += (' Act as a professional audiovisual translator. Translate meaning in context using natural, '
@@ -135,7 +135,8 @@ def transcribe(audio, key, model, language, duration, offset, google_key='', can
         texts=translated['data']['translations']
         if len(texts)!=len(cues): raise ValueError('Jumlah hasil terjemahan tidak cocok')
         for cue,text in zip(cues,texts): cue.target=html.unescape(text['translatedText'])
-    return cues
+    from language_check import check_source_languages
+    return check_source_languages(cues,language)
 
 def stamp(seconds):
     n=round(seconds*1000)

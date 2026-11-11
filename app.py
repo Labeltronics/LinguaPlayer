@@ -304,7 +304,7 @@ class Window(PlayerExtras,QMainWindow):
     def receive_chunk(self,cues,coverage):
         self.coverage=coverage;self.fill(self.cues+list(cues))
         langs=sorted({c.language for c in self.cues if c.language})
-        if langs:self.detected.setText('Bahasa sumber terdeteksi: '+', '.join(langs)+' → '+self.lang.currentText())
+        if langs:self.detected.setText('Bahasa sumber terdeteksi (perkiraan): '+', '.join(langs)+' → '+self.lang.currentText())
         if self.buffering and self.player.get_time()/1000 < self.coverage-.15:
             self.buffering=False
             if self.want_play:self.player.play()
@@ -414,7 +414,8 @@ if __name__=='__main__':
                     output.write_text(json.dumps({'playback':playback,'browser':browser,'credential_manager':'PASS','qt_window':'PASS','vlc_version':vlc.libvlc_get_version().decode(),'ffmpeg':'PASS'}),encoding='utf-8')
                     w.close();app.exit(0)
                 except Exception as e:
-                    output.write_text(json.dumps({'error':str(e)}),encoding='utf-8');app.exit(1)
+                    import traceback
+                    output.write_text(json.dumps({'error':str(e),'traceback':traceback.format_exc(),'partial_playback':locals().get('playback')}),encoding='utf-8');app.exit(1)
             QTimer.singleShot(500,self_test)
         sys.exit(app.exec())
     except Exception as e:QMessageBox.critical(None,'Gagal mulai',f'{e}\nPastikan VLC 64-bit terpasang atau folder vlc dibundel.');sys.exit(1)

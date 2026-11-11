@@ -18,7 +18,7 @@ def wait(predicate,seconds=20):
 def javascript(page,code):
     result=[];page.runJavaScript(code,result.append);wait(lambda:bool(result));return result[0]
 def run_browser_checks(owner):
-    flags={'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {};ff=imageio_ffmpeg.get_ffmpeg_exe();report={}
+    flags={'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {};ff=imageio_ffmpeg.get_ffmpeg_exe();report={};stage='fixture'
     with tempfile.TemporaryDirectory(prefix='cyber80-web-') as d:
         root=Path(d);video=root/'fixture.webm';audio=root/'fixture.wav';payload=b'CYBER80 DOWNLOAD FIXTURE'*4096;(root/'download.bin').write_bytes(payload)
         subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','testsrc2=size=176x144:rate=10:duration=4','-c:v','libvpx','-b:v','150k',str(video)],check=True,**flags)
@@ -29,21 +29,27 @@ def run_browser_checks(owner):
             def log_message(self,*args):pass
         http=ThreadingHTTPServer(('127.0.0.1',0),Handler);thread=threading.Thread(target=http.serve_forever,daemon=True);thread.start();base=f'http://127.0.0.1:{http.server_port}'
         browser=owner.open_browser(True);view=browser.current();view.settings().setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture,False)
+        load_events=[];view.loadFinished.connect(lambda ok:load_events.append(bool(ok)))
         try:
+            stage='page load'
             view.setUrl(QUrl(base+'/index.html'));wait(lambda:view.title()=='Cyber80 browser acceptance');wait(lambda:javascript(view.page(),"document.readyState")=='complete')
-            report['page_load']='PASS';javascript(view.page(),"document.getElementById('v').play().then(()=>true).catch(()=>false);true")
+            stage='WebM playback';report['page_load']='PASS';javascript(view.page(),"document.getElementById('v').play().then(()=>true).catch(()=>false);true")
             wait(lambda:(javascript(view.page(),"document.getElementById('v').currentTime") or 0)>.2);report['actual_webm_playback']='PASS'
-            javascript(view.page(),"document.getElementById('a').play().then(()=>true).catch(()=>false);true")
+            stage='audio playback';javascript(view.page(),"document.getElementById('a').play().then(()=>true).catch(()=>false);true")
             wait(lambda:(javascript(view.page(),"document.getElementById('a').currentTime") or 0)>.2);report['actual_audio_playback']='PASS'
-            browser.scan();wait(lambda:any(v['name']=='fixture.webm' for v in browser.media));wait(lambda:any(v['name']=='fixture.wav' for v in browser.media));report['dom_network_mime_detection']='PASS'
-            manager=owner.get_download_manager();target=root/'queued.bin';record=manager.add(base+'/download.bin','queued.bin',target=target,private=True)
+            stage='media detection';browser.scan();wait(lambda:any(v['name']=='fixture.webm' for v in browser.media));wait(lambda:any(v['name']=='fixture.wav' for v in browser.media));report['dom_network_mime_detection']='PASS'
+            stage='HTTP download queue';manager=owner.get_download_manager();target=root/'queued.bin';record=manager.add(base+'/download.bin','queued.bin',target=target,private=True)
             wait(lambda:record['status'] in ('Completed','Failed'));assert record['status']=='Completed',record;assert target.read_bytes()==payload;report['download_queue_real_http']='PASS'
-            native=root/'native.bin'
+            stage='native Chromium download';native=root/'native.bin'
             with patch.object(QFileDialog,'getSaveFileName',return_value=(str(native),'')):
                 view.page().download(QUrl(base+'/download.bin'),'native.bin');wait(lambda:native.is_file() or any(r['kind']=='native' and r['status']=='Failed' for r in manager.records))
                 assert native.is_file(),'Native browser download failed';assert native.read_bytes()==payload
             report['native_browser_download']='PASS';report['private_profile']=browser.profile.isOffTheRecord();report['browser_codecs']=javascript(view.page(),"JSON.stringify({webm:document.createElement('video').canPlayType('video/webm; codecs=\"vp8\"'),h264:document.createElement('video').canPlayType('video/mp4; codecs=\"avc1.42E01E\"'),mp3:document.createElement('audio').canPlayType('audio/mpeg')})")
+        except Exception as exc:
+            diagnostics={'stage':stage,'title':view.title(),'url':view.url().toString(),'load_events':load_events,'status':browser.status.text(),'media_count':len(browser.media),'requests_in_flight':len(browser.probes),'passed':report}
+            raise RuntimeError('Browser acceptance: '+json.dumps(diagnostics)+'; '+str(exc)) from exc
         finally:
-            javascript(view.page(),"document.querySelectorAll('video,audio').forEach(e=>{e.pause();e.removeAttribute('src');e.load();});true")
-            wait(lambda:not owner.get_download_manager().active());browser.hide();view.setUrl(QUrl('about:blank'));QApplication.processEvents();http.shutdown();http.server_close();thread.join()
+            try:javascript(view.page(),"document.querySelectorAll('video,audio').forEach(e=>{e.pause();e.removeAttribute('src');e.load();});true")
+            except Exception:pass
+            browser.hide();view.setUrl(QUrl('about:blank'));QApplication.processEvents();http.shutdown();http.server_close();thread.join()
     return report

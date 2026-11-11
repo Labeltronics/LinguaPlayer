@@ -3,12 +3,13 @@ Protocol references: https://ai.google.dev/gemini-api/docs/files
 https://ai.google.dev/gemini-api/docs/generate-content/video-understanding
 No video or credential is ever embedded in a public repository.
 """
-import json,math,re,time,urllib.request,urllib.error,urllib.parse,socket,subprocess,tempfile,os,uuid
+import json,math,re,time,wave,urllib.request,urllib.error,urllib.parse,socket,subprocess,tempfile,os,uuid
 from pathlib import Path
 from PySide6.QtCore import QThread,Signal
 import imageio_ffmpeg
-from core import APIError,api_message,request_json,validate,srt,wait_cancel
+from core import APIError,APITimeout,api_message,request_json,validate,srt,wait_cancel,transcribe
 from storage import media_key,write_json_atomic
+from language_check import check_source_languages
 BASE='https://generativelanguage.googleapis.com'
 MIMES={'.mp4':'video/mp4','.m4v':'video/mp4','.mpeg':'video/mpeg','.mpg':'video/mpeg','.mov':'video/quicktime','.avi':'video/avi','.flv':'video/x-flv','.webm':'video/webm','.wmv':'video/wmv','.3gp':'video/3gpp'}
 MAX_UPLOAD=2_000_000_000
@@ -39,8 +40,10 @@ def api_exchange(url,key,method='GET',data=None,headers=None,timeout=60):
         detail=str(detail).replace(key,'[KEY DISEMBUNYIKAN]') if key else str(detail)
         detail=re.sub(r'(?:AIza|AQ\.)[A-Za-z0-9_.-]+','[KEY DISEMBUNYIKAN]',detail)[:1000]
         raise APIError(api_message(exc.code,detail),exc.code) from None
-    except (TimeoutError,socket.timeout):raise APIError('Upload/metadata Gemini timeout. Coba lagi; sumber dan hasil parsial dipertahankan.') from None
-    except (urllib.error.URLError,ConnectionError):raise APIError('Koneksi Files API terputus. Periksa jaringan; sumber dan hasil parsial dipertahankan.') from None
+    except (TimeoutError,socket.timeout):raise APITimeout('Upload/metadata Gemini timeout. Coba lagi; sumber dan hasil parsial dipertahankan.') from None
+    except (urllib.error.URLError,ConnectionError) as exc:
+        if isinstance(getattr(exc,'reason',None),(TimeoutError,socket.timeout)):raise APITimeout('Koneksi Files API timeout.') from None
+        raise APIError('Koneksi Files API terputus. Periksa jaringan; sumber dan hasil parsial dipertahankan.') from None
 
 def upload_video(path,key,cancelled,progress):
     path=Path(path);size=path.stat().st_size
@@ -82,7 +85,7 @@ def active_file(metadata,key,cancelled,progress,max_wait=1800):
 def attachment_payload(uri,mime,start,end,language,glossary):
     safe_url(uri)
     prompt=(f'Act as a professional audiovisual translator. Listen to the actual speech in this video interval [{start:.3f}, {end:.3f}] seconds. '
-        f'Detect spoken language and translate to {language}. Return only a JSON array of cues with numeric start, end, source, target and language (ISO code). '
+        f'Detect spoken language and translate to {language}. Return only a JSON array of cues with numeric start, end, source, target and language (ISO code of the ORIGINAL SPOKEN language, NEVER the translation target). '
         f'Use ABSOLUTE seconds from the beginning of the ORIGINAL video, NOT relative to the selected interval. All cues must be within {start:.3f} and {end:.3f}. '
         'Do not summarize. Transcribe all audible dialogue faithfully, without inventing words from visual content or silence. '
         'Use correct spelling, punctuation, concise readable lines and natural professional translation. For Indonesian use standard Indonesian/EYD. '
@@ -105,8 +108,8 @@ def write_srt_atomic(path,cues):
 
 class BackgroundSubtitleJob(QThread):
     progress=Signal(str);completed=Signal(str,object);failed=Signal(str)
-    def __init__(self,source,target,key,model,language='id',glossary='',proxy=False,audio_stream=0,persist=True):
-        super().__init__();self.source=str(Path(source).resolve());self.target=str(Path(target).resolve());self.key=key;self.model=model;self.language=language;self.glossary=glossary;self.proxy=proxy;self.audio_stream=audio_stream;self.persist=persist;self.proc=None
+    def __init__(self,source,target,key,model,language='id',glossary='',proxy=False,audio_stream=0,persist=True,fallback_audio=True):
+        super().__init__();self.source=str(Path(source).resolve());self.target=str(Path(target).resolve());self.key=key;self.model=model;self.language=language;self.glossary=glossary;self.proxy=proxy;self.audio_stream=audio_stream;self.persist=persist;self.fallback_audio=fallback_audio;self.proc=None
     def cancel(self):
         self.requestInterruption()
         if self.proc:
@@ -128,6 +131,20 @@ class BackgroundSubtitleJob(QThread):
                 except subprocess.TimeoutExpired:pass
             if self.proc.returncode:raise ValueError('Proxy gagal dibuat. Periksa track audio, ruang disk, dan file sumber.')
         self.proc=None;return target
+    def audio_interval(self,video,temp,offset,end):
+        target=Path(temp)/'fallback.wav';flags={'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}
+        self.progress.emit(f'Fallback audio model sama: {offset:.0f}–{end:.0f} detik. Kuota API tetap berlaku.')
+        with tempfile.TemporaryFile() as errors:
+            self.proc=subprocess.Popen([imageio_ffmpeg.get_ffmpeg_exe(),'-v','error','-y','-ss',str(offset),'-i',str(video),'-t',str(end-offset),'-map','0:a:0','-vn','-ac','1','-ar','16000',str(target)],stdout=subprocess.DEVNULL,stderr=errors,**flags)
+            while self.proc.poll() is None:
+                if self.isInterruptionRequested():self.proc.kill();self.proc.wait();raise InterruptedError('Dibatalkan')
+                time.sleep(.1)
+            if self.proc.returncode:raise ValueError('Audio fallback tidak dapat dibaca dari video.')
+        self.proc=None
+        with wave.open(str(target)) as audio:duration=audio.getnframes()/audio.getframerate()
+        if duration<.05:return []
+        return transcribe(target.read_bytes(),self.key,self.model,self.language,duration,offset,cancelled=self.isInterruptionRequested,glossary=self.glossary,progress=self.progress.emit,timeout=180)
+    def transient(self,error):return self.fallback_audio and (isinstance(error,APITimeout) or isinstance(error,APIError) and error.status in (408,500,502,503,504))
     def run(self):
         remote=None;cues=[];offset=0.;checkpoint=Path(self.target+'.progress.json');partial=Path(self.target+'.partial.srt')
         try:
@@ -144,16 +161,28 @@ class BackgroundSubtitleJob(QThread):
                 finally:reader.close()
                 if not math.isfinite(duration) or duration<=0:raise ValueError('Durasi video tidak dapat dibaca.')
                 if not math.isfinite(offset) or offset<0 or offset>duration:raise ValueError('Checkpoint attachment tidak valid.')
-                remote=upload_video(video,self.key,self.isInterruptionRequested,self.progress.emit)
-                remote=active_file(remote,self.key,self.isInterruptionRequested,self.progress.emit)
+                use_audio=False
+                try:
+                    remote=upload_video(video,self.key,self.isInterruptionRequested,self.progress.emit)
+                    remote=active_file(remote,self.key,self.isInterruptionRequested,self.progress.emit)
+                except APIError as error:
+                    if not self.transient(error):raise
+                    use_audio=True;self.progress.emit('Layanan attachment sementara gagal; beralih ke audio pada model yang sama.')
                 while offset<duration-.05:
                     if self.isInterruptionRequested():raise InterruptedError('Dibatalkan')
                     end=min(duration,offset+120)
                     self.progress.emit(f'Analisis suara / terjemahan: {offset/duration*100:.1f}% ({offset:.0f}–{end:.0f} detik)')
-                    data=request_json(BASE+'/v1beta/models/'+self.model+':generateContent',self.key,
-                        attachment_payload(remote['uri'],remote.get('mimeType',MIMES.get(video.suffix.lower(),'video/mp4')),offset,end,self.language,self.glossary),
-                        self.isInterruptionRequested,self.progress.emit,180)
-                    cues.extend(extract_attachment_cues(data,offset,end));offset=end
+                    if use_audio:chunk=self.audio_interval(video,temp,offset,end)
+                    else:
+                        try:
+                            data=request_json(BASE+'/v1beta/models/'+self.model+':generateContent',self.key,
+                                attachment_payload(remote['uri'],remote.get('mimeType',MIMES.get(video.suffix.lower(),'video/mp4')),offset,end,self.language,self.glossary),
+                                self.isInterruptionRequested,self.progress.emit,180)
+                            chunk=check_source_languages(extract_attachment_cues(data,offset,end),self.language)
+                        except APIError as error:
+                            if not self.transient(error):raise
+                            use_audio=True;self.progress.emit('Analisis video sedang sibuk/timeout; mencoba audio pada model yang sama.');chunk=self.audio_interval(video,temp,offset,end)
+                    cues.extend(chunk);offset=end
                     if self.persist:
                         write_srt_atomic(partial,cues);write_json_atomic(checkpoint,{'context':context,'offset':offset,'cues':[vars(c) for c in cues]})
                 if self.isInterruptionRequested():raise InterruptedError('Dibatalkan')

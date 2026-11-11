@@ -70,11 +70,11 @@ Pilih lokasi hasil sebelum proses. Terdapat pembatalan dan notifikasi serta tomb
 
 ## Bukti dan batas pengujian
 
-85 tes otomatis lokal mencakup suite sebelumnya ditambah HTTP server sungguhan untuk resume/paralel/fallback, redirect/cookie isolation, HTTP403, checksum, target berubah, disk penuh, HLS dan DASH nyata lalu remux FFmpeg, kontrol speed/scroll/zoom, trim range, stereo packing dan inference model MiDaS CPU asli. Subtes FFmpeg mencakup hard subtitle, video lirik, pemotongan video/audio dan alat sebelumnya.
+86 tes otomatis lokal mencakup suite sebelumnya ditambah HTTP server sungguhan untuk resume/paralel/fallback, redirect/cookie isolation, HTTP403, checksum, target berubah, disk penuh, HLS dan DASH nyata lalu remux FFmpeg, kontrol speed/scroll/zoom, trim range, stereo packing dan inference model MiDaS CPU asli. Subtes FFmpeg mencakup hard subtitle, video lirik, pemotongan video/audio dan alat sebelumnya.
 
 Laporan Windows di HASIL_UJI_WINDOWS.json mencatat tes EXE yang benar-benar dijalankan, termasuk browser lokal, deteksi MIME/DOM, pemutaran WebM/WAV, download HTTP/native Chromium, cutting visual, zoom/capture/reset, dan preview/ekspor stereo MiDaS. Hanya klaim PASS yang tercatat boleh dianggap teruji di build tersebut. Browser cloud Linux tanpa display GPU mengalami masalah renderer; hasil itu tidak dipromosikan sebagai pengujian browser sukses.
 
-Tidak ada kunjungan ke akun/situs pribadi atau inferensi Gemini memakai key pengguna. GPU fisik, TV 3D fisik, headset, HDR, kualitas terjemahan film nyata, seluruh situs/codec, pembatalan koneksi seketika dan stress 24 jam belum diverifikasi. Konektivitas socket aktif dapat menunggu timeout hingga 20 detik pada downloader dan hingga 180 detik pada Gemini.
+Suite otomatis tidak mengunjungi akun/situs pribadi atau melakukan inferensi Gemini. Uji langsung terbatas dengan key pengguna dijelaskan terpisah di bagian verifikasi Gemini di bawah. GPU fisik, TV 3D fisik, headset, HDR, kualitas terjemahan film nyata, seluruh situs/codec, pembatalan koneksi seketika dan stress 24 jam belum diverifikasi. Konektivitas socket aktif dapat menunggu timeout hingga 20 detik pada downloader dan hingga 180 detik pada Gemini.
 
 
 ## Preferensi pencarian dan akses jaringan
@@ -82,3 +82,12 @@ Tidak ada kunjungan ke akun/situs pribadi atau inferensi Gemini memakai key peng
 Google menjadi pencarian default. Checkbox **Google SafeSearch: Off** menambahkan `safe=off` pada pencarian dan menyesuaikan URL pencarian Google yang didukung. Ini preferensi pengguna, bukan bypass kebijakan akun/administrator; rewrite dibatasi agar tidak berputar tanpa akhir jika Google memaksakan filter. Tidak ada filter konten tambahan dari aplikasi.
 
 **Proxy / akses jaringan** mendukung proxy sistem/VPN Windows, tanpa proxy, atau proxy HTTP/HTTPS CONNECT milik pengguna dengan username/password opsional. Konfigurasi berlaku pada browser dan koneksi downloader baru dalam proses ini; bukan per-tab/per-profil. Penyimpanan konfigurasi hanya melalui Windows Credential Manager bila dipilih. Tidak disediakan proxy/VPN publik gratis bawaan, SOCKS5, Tor, atau jaminan semua situs diblokir akan terbuka. Pengaturan tidak menonaktifkan verifikasi sertifikat HTTPS, sandbox Chromium, DRM atau kontrol akses situs. Mengubah proxy tidak memindahkan koneksi yang sudah aktif; muat ulang atau mulai ulang tugas yang bersangkutan.
+
+
+## Verifikasi Gemini asli terbaru
+
+Pemeriksaan metadata API berhasil dan model gemini-3.5-flash-lite tersedia. Transkripsi suara sintetis Inggris 4,23 detik ke Indonesia berhasil, dua cue SRT tersimpan, 22,71 detik termasuk retry (dua request). Uji attachment pertama mendapat HTTP503 layanan sibuk; uji ulang attachment berhasil dalam 65 detik, tanpa memakai fallback audio. Lihat GEMINI_LIVE_TEST_REPORT.json dan examples/ untuk hasil asli tanpa API key. Tidak ada film/audio pribadi pengguna yang diunggah. Uji langsung ini menggunakan kuota proyek Free Tier yang disebutkan pengguna; aplikasi tidak mengaktifkan billing.
+
+Satu respons attachment salah memberi label bahasa sumber `id` walau transkripnya Inggris. Prompt kini menegaskan bahwa kode bahasa harus milik suara asli. Pemeriksa teks offline meninjau label yang kosong/unknown/sama dengan bahasa target untuk teks cukup panjang dan keyakinan ≥98%; hasil tidak dijamin benar untuk semua bahasa, teks pendek atau campuran. Transkrip/terjemahan mentah dalam laporan tetap dipertahankan, tidak disamarkan sebagai output model yang sempurna.
+
+Fallback audio dapat dinonaktifkan di panel attachment. Saat aktif, kegagalan sementara 408/500/502/503/504 atau timeout pada jalur video dapat beralih ke audio dari video yang sama, model tetap sama. Kuota tambahan mungkin terpakai; tidak ada model/layanan berbayar otomatis. Fallback tidak dijalankan untuk 403 atau kuota 429. Uji fallback menggunakan server/response tiruan; uji langsung attachment terakhir berhasil pada jalur video sehingga fallback tidak diperlukan. Server Google tetap dapat sibuk, dan latensi tersebut bukan jaminan real-time/tanpa delay.

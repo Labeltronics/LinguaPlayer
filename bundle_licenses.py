@@ -4,7 +4,7 @@ from pathlib import Path
 root=Path('dist/Cyber80Players/THIRD_PARTY_LICENSES');root.mkdir(parents=True,exist_ok=True)
 for dist in importlib.metadata.distributions():
     name=dist.metadata.get('Name','')
-    if not name.lower().replace('-','_').startswith(('pyside6','shiboken6','onnxruntime','numpy','imageio_ffmpeg','python_vlc')):continue
+    if not name.lower().replace('-','_').startswith(('pyside6','shiboken6','onnxruntime','numpy','imageio_ffmpeg','python_vlc','langdetect')):continue
     for file in dist.files or []:
         lower=str(file).lower();base=Path(file).name.lower()
         if '/licenses/' not in lower and not base.startswith(('license','copying','copyright','notice','thirdparty')):continue

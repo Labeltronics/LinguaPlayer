@@ -32,3 +32,12 @@ class CoreTests(unittest.TestCase):
     def test_source_export(self):self.assertIn('Hello',srt([Cue(0,1,'Hello','Halo')],False))
 
 if __name__=='__main__':unittest.main()
+
+
+class LanguageLabelTests(unittest.TestCase):
+    def test_source_language_is_not_translation_language(self):
+        from core import Cue
+        from language_check import check_source_languages
+        cue=Cue(0,4,'Hello world welcome to Cyber80player this is a subtitle test','Halo dunia','id')
+        self.assertEqual(check_source_languages([cue],'id')[0].language,'en')
+        short=Cue(0,1,'Hi','Hai','id');self.assertEqual(check_source_languages([short],'id')[0].language,'id')

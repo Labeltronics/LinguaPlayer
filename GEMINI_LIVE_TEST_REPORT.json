@@ -1,0 +1,69 @@
+{
+  "metadata_connection": "PASS",
+  "audio": {
+    "live_transcription": "PASS",
+    "model": "gemini-3.5-flash-lite",
+    "duration_seconds": 4.23,
+    "elapsed_seconds": 22.71,
+    "request_count": 2,
+    "cues": [
+      {
+        "start": 0,
+        "end": 2.15,
+        "source": "Hello world, welcome to Cyber 80 Player.",
+        "target": "Halo dunia, selamat datang di Cyber 80 Player.",
+        "language": "en"
+      },
+      {
+        "start": 2.15,
+        "end": 4.23,
+        "source": "This is a subtitle test.",
+        "target": "Ini adalah tes takarir.",
+        "language": "en"
+      }
+    ],
+    "real_user_media_uploaded": false,
+    "billing_enabled_by_application": false
+  },
+  "attachment_initial": {
+    "live_attachment": "FAILED",
+    "elapsed_seconds": 71.0,
+    "errors": [
+      "API HTTP 503: Layanan Gemini sedang sibuk.\nDetail Google: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\nHasil parsial/checkpoint dipertahankan jika tersedia."
+    ],
+    "cues": [],
+    "last_progress": [
+      "Menunggu 3 detik sebelum mencoba lagi …",
+      "Menunggu 2 detik sebelum mencoba lagi …",
+      "Menunggu 1 detik sebelum mencoba lagi …",
+      "Menghubungi Gemini (percobaan 2/2, batas waktu 180 detik) …"
+    ],
+    "real_user_media_uploaded": false,
+    "billing_enabled_by_application": false
+  },
+  "attachment_retry": {
+    "live_attachment_pipeline": "PASS",
+    "elapsed_seconds": 65.0,
+    "errors": [],
+    "cues": [
+      {
+        "start": 0.0,
+        "end": 4.23,
+        "source": "Hello world welcome to Cyber80player this is a subtitle test",
+        "target": "Halo dunia, selamat datang di pemutar Cyber80, ini adalah tes subtitel.",
+        "language": "id"
+      }
+    ],
+    "audio_fallback_used": false,
+    "last_progress": [
+      "Menunggu 3 detik sebelum mencoba lagi …",
+      "Menunggu 2 detik sebelum mencoba lagi …",
+      "Menunggu 1 detik sebelum mencoba lagi …",
+      "Menghubungi Gemini (percobaan 2/2, batas waktu 180 detik) …",
+      "Menyimpan subtitle SRT …"
+    ],
+    "real_user_media_uploaded": false,
+    "billing_enabled_by_application": false
+  },
+  "scope": "Synthetic 4.23 second English speech, translated to Indonesian. Not a long-film quality assessment. API key omitted."
+}

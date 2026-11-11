@@ -71,6 +71,10 @@ class AttachmentTests(unittest.TestCase):
             def upload(path,*args):self.assertGreater(Path(path).stat().st_size,100);return REMOTE
             with patch.object(bg,'upload_video',side_effect=upload),patch.object(bg,'request_json',return_value=response([])),patch.object(bg,'api_exchange',return_value=({},{})):job.run()
             self.assertFalse(errors);self.assertTrue(target.exists());self.assertTrue(source.exists())
+            fallback_target=Path(d)/'fallback.srt';fallback=bg.BackgroundSubtitleJob(source,fallback_target,'dummy','model',proxy=True);fallback_errors=[];fallback.failed.connect(fallback_errors.append)
+            with patch.object(bg,'upload_video',side_effect=upload),patch.object(bg,'request_json',side_effect=bg.APIError('busy',503)),patch.object(bg,'api_exchange',return_value=({},{})),patch.object(bg,'transcribe',return_value=[Cue(0,1,'Hello','Halo','en')]) as audio:
+                fallback.run();self.assertFalse(fallback_errors);self.assertEqual(audio.call_args.args[2],'model');self.assertIn('Halo',fallback_target.read_text())
+            self.assertFalse(fallback.transient(bg.APIError('permission',403)));self.assertFalse(fallback.transient(bg.APIError('quota',429)));self.assertTrue(fallback.transient(bg.APITimeout('timeout')))
     @patch.object(app.vlc,'Instance',side_effect=fake_engine)
     def test_finished_notification_does_not_replace_another_movies_subtitles(self,factory):
         w=app.Window();w.path='other.mp4';w.fill([Cue(0,1,'Other')]);w.background_job=MagicMock(source='source.mp4');w.background_job.isRunning.return_value=False

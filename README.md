@@ -1,13 +1,9 @@
-# Pembaruan terbaru
-
-Lihat [Browser, Download, Cutting, Stereo TV, Zoom dan Hard Subtitle](CYBER80_BROWSER_3D_ID.md). Paket mencakup browser Chromium, model MiDaS ONNX dan runtime.
-
 # Cyber80 Players
 
-Windows video/audio player dengan subtitle AI, tema, playlist, PiP, dua pemain, EQ, 3D anaglyph dan ekspor HD/4K.
+Pemutar video/audio Windows dengan browser multimedia, Download Manager, cutting visual, subtitle Gemini, hard subtitle/video lirik, stereo depth AI, PiP, playlist, equalizer, zoom dan capture.
 
-Pembaruan: [fitur modern & attachment subtitle](PEMBARUAN_CYBER80_ID.md). Ada 63 tes otomatis; lihat hasil workflow Windows untuk bukti EXE. Tidak menjamin semua codec, terjemahan 100%, atau GPU fisik.
+[Modul terbaru dan batasannya](CYBER80_BROWSER_3D_ID.md) · [Petunjuk](QUICK_START_ID.txt) · [Audit sebelumnya](AUDIT_CYBER80_PLAYERS_ID.md) · [Hasil uji Gemini asli](GEMINI_LIVE_TEST_REPORT.json)
 
-[Petunjuk Indonesia](QUICK_START_ID.txt) · [Build Windows](build_windows.ps1) · [Audit](AUDIT_CYBER80_PLAYERS_ID.md)
+86 tes otomatis lokal; lihat workflow Windows dan HASIL_UJI_WINDOWS.json untuk bukti EXE. Uji Gemini memakai suara sintetis 4,23 detik: audio dan attachment berhasil; server sempat503. Tidak ada jaminan semua codec/situs, kualitas100%, atau tanpa delay. GPU/TV3D fisik belum diuji. 4D adalah cue preview, bukan kontrol perangkat fisik.
 
-Tidak ada API key ditanamkan. Whisper/Ollama memerlukan instalasi terpisah.
+Tidak ada API key ditanamkan. Runtime Chromium, VLC/FFmpeg, ONNX dan model MiDaS tersedia dalam paket build. [Build Windows](build_windows.ps1).

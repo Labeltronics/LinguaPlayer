@@ -1,5 +1,5 @@
-# Laporan pengujian pembaruan
+# Pengujian Cyber80 terbaru
 
-63 tes Python/Qt lulus lokal. Tes attachment Gemini menggunakan mock dan tidak menghabiskan kuota pengguna. Enam alat media dan proxy TS→MP4 dijalankan dengan FFmpeg asli. Workflow Windows menjalankan suite yang sama kemudian EXE portable dengan VLC sistem dinonaktifkan. Bukti runtime terperinci disimpan dalam HASIL_UJI_WINDOWS.json di paket hasil build.
+86 tes otomatis lokal lulus untuk modul inti, unduhan, kontrol baru, stereo, dan subtitle. Laporan EXE Windows hanya berlaku untuk skenario PASS yang tercatat dalam HASIL_UJI_WINDOWS.json.
 
-Pengujian GPU fisik/HDR, kualitas inference Gemini asli, kualitas akustik DSP, screen reader, dan stress 24 jam belum dilakukan. Lihat PEMBARUAN_CYBER80_ID.md untuk batas fitur dan daftar pekerjaan yang belum selesai.
+Gemini asli: metadata PASS; transkripsi suara sintetis 4,23 detik ke Indonesia PASS; attachment awal503 lalu uji ulang PASS. Lihat GEMINI_LIVE_TEST_REPORT.json, examples/, dan CYBER80_BROWSER_3D_ID.md untuk scope, latensi, label bahasa yang dikoreksi, dan batasan. API key tidak disertakan.

@@ -94,10 +94,14 @@ class BrowserWindow(QDialog):
     def add_tab(self,url):
         view=WebView(self);page=WebPage(self.profile,view);view.setPage(page);view.settings().setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled,True)
         view.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls,False);view.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls,False)
-        page.fullScreenRequested.connect(self.fullscreen_request);page.proxyAuthenticationRequired.connect(self.proxy_authentication);page.renderProcessTerminated.connect(lambda *args:self.status.setText('Proses tab berhenti. Muat ulang tab; pemutar utama tetap terpisah.'))
+        page.fullScreenRequested.connect(self.fullscreen_request);page.proxyAuthenticationRequired.connect(self.proxy_authentication);page.renderProcessTerminated.connect(lambda reason,code:self.status.setText(f'Proses tab berhenti: {reason}, kode {code}. Muat ulang tab.'));page.loadingChanged.connect(self.loading_info)
         if hasattr(page,'permissionRequested'):page.permissionRequested.connect(lambda permission:permission.deny())
-        view.titleChanged.connect(lambda title,v=view:self.tabs.setTabText(self.tabs.indexOf(v),title[:50] or 'Tab'));view.urlChanged.connect(lambda value,v=view:self.url_changed(v,value));view.loadFinished.connect(lambda ok:self.scan() if ok else self.status.setText('Halaman gagal dimuat; periksa URL, internet, atau kebijakan situs.'))
+        view.titleChanged.connect(lambda title,v=view:self.tabs.setTabText(self.tabs.indexOf(v),title[:50] or 'Tab'));view.urlChanged.connect(lambda value,v=view:self.url_changed(v,value));view.loadFinished.connect(lambda ok:self.scan() if ok else None)
         self.tabs.addTab(view,'Tab');self.tabs.setCurrentWidget(view);view.setUrl(QUrl(url));return view
+    def loading_info(self,info):
+        if info.errorCode():
+            message=re.sub(r'https?://\S+','[alamat]',info.errorString())
+            self.status.setText(f'Halaman gagal, kode {info.errorCode()}: {message[:240]}')
     def proxy_authentication(self,url,authenticator,host):
         from network_preferences import proxy_credentials
         credentials=proxy_credentials(host)

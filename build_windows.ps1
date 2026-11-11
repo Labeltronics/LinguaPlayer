@@ -18,7 +18,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Tes gagal.' }
 $VlcDirectory = Join-Path $env:ProgramFiles 'VideoLAN\VLC'
 if ($env:LINGUAPLAYER_VLC_DIR) { $VlcDirectory = $env:LINGUAPLAYER_VLC_DIR }
 if (-not (Test-Path (Join-Path $VlcDirectory 'libvlc.dll'))) { throw 'Pasang VLC Windows 64-bit resmi dahulu, atau set LINGUAPLAYER_VLC_DIR.' }
-& $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name Cyber80Players --icon assets/cyber80.ico --add-data "assets;assets" --collect-all imageio_ffmpeg --collect-all onnxruntime --add-data "models;models" --add-data "${VlcDirectory};vlc" app.py
+& $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name Cyber80Players --icon assets/cyber80.ico --add-data "assets;assets" --collect-all imageio_ffmpeg --collect-all onnxruntime --collect-all langdetect --add-data "models;models" --add-data "${VlcDirectory};vlc" app.py
 if ($LASTEXITCODE -ne 0) { throw 'Build gagal.' }
 & $Python bundle_licenses.py
 if ($LASTEXITCODE -ne 0) { throw 'Penyalinan lisensi gagal.' }
@@ -26,6 +26,8 @@ Copy-Item QUICK_START_ID.txt dist\Cyber80Players\
 Copy-Item AUDIT_CYBER80_PLAYERS_ID.md dist\Cyber80Players\
 Copy-Item PEMBARUAN_CYBER80_ID.md dist\Cyber80Players\
 Copy-Item CYBER80_BROWSER_3D_ID.md dist\Cyber80Players\
+Copy-Item GEMINI_LIVE_TEST_REPORT.json dist\Cyber80Players\
+Copy-Item examples dist\Cyber80Players\ -Recurse
 Copy-Item AI_LOKAL_ID.md dist\Cyber80Players\
 Copy-Item LICENSE dist\Cyber80Players\
 Copy-Item README_ID.md dist\Cyber80Players\
