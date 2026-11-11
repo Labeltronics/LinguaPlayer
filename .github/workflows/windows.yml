@@ -1,0 +1,32 @@
+name: Build Windows EXE
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Install VLC
+        run: choco install vlc --yes --no-progress
+      - name: Build and test
+        shell: pwsh
+        run: ./build_windows.ps1
+      - name: Test packaged EXE startup
+        shell: pwsh
+        run: |
+          $p = Start-Process dist\LinguaPlayer\LinguaPlayer.exe -ArgumentList '--self-test', "$env:RUNNER_TEMP\lingua-test.json" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw 'EXE self-test failed' }
+          Get-Content "$env:RUNNER_TEMP\lingua-test.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LinguaPlayer-Windows-x64
+          path: dist/LinguaPlayer/
