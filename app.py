@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,
     QFileDialog,QLabel,QLineEdit,QComboBox,QSlider,QTableWidget,QTableWidgetItem,QMessageBox,QSpinBox)
 from core import Cue, transcribe, srt
+from credentials import save_key, load_key, delete_key
 
 class Job(QThread):
     progress=Signal(str)
@@ -68,13 +69,14 @@ class Window(QMainWindow):
         self.seek=QSlider(Qt.Horizontal); self.seek.setRange(0,1000); self.seek.sliderReleased.connect(lambda:self.player.set_position(self.seek.value()/1000)); row.addWidget(self.seek,1)
         volume=QSlider(Qt.Horizontal); volume.setRange(0,100); volume.setValue(80); volume.setMaximumWidth(100); volume.valueChanged.connect(self.player.audio_set_volume); row.addWidget(QLabel('Volume'));row.addWidget(volume);self.player.audio_set_volume(80)
         row=QHBoxLayout();layout.addLayout(row)
-        self.key=QLineEdit(os.getenv('GEMINI_API_KEY',''));self.key.setEchoMode(QLineEdit.Password);self.key.setPlaceholderText('Gemini API key (tidak disimpan)');row.addWidget(self.key)
+        self.key=QLineEdit(os.getenv('GEMINI_API_KEY',''));self.key.setEchoMode(QLineEdit.Password);self.key.setPlaceholderText('Gemini API key');row.addWidget(self.key)
         self.model=QLineEdit('gemini-2.5-flash');self.model.setMaximumWidth(170);row.addWidget(self.model)
         self.lang=QComboBox();self.lang.setEditable(True)
         for name,code in [('Indonesia','id'),('English','en'),('Mandarin','zh-CN'),('Jepang','ja'),('Korea','ko'),('Arab','ar'),('Spanyol','es'),('Prancis','fr'),('Jerman','de'),('Hindi','hi'),('Portugis','pt'),('Rusia','ru'),('Thai','th'),('Vietnam','vi')]: self.lang.addItem(name,code)
         row.addWidget(self.lang)
         self.google=QLineEdit(os.getenv('GOOGLE_TRANSLATE_API_KEY',''));self.google.setEchoMode(QLineEdit.Password);self.google.setPlaceholderText('Google Translate key (opsional)');row.addWidget(self.google)
         row=QHBoxLayout();layout.addLayout(row)
+        self.button(row,'Simpan API key di Windows',self.save_keys);self.button(row,'Hapus key tersimpan',self.delete_keys)
         self.glossary=QLineEdit();self.glossary.setPlaceholderText('Kamus ejaan: nama orang, merek, istilah khusus (untuk transkripsi/Gemini)');layout.addWidget(self.glossary)
         self.generate=self.button(row,'Buat subtitle online',self.process);self.cancel=self.button(row,'Batalkan',self.cancel_job);self.cancel.setEnabled(False)
         self.button(row,'Buka SRT offline',self.import_srt);self.button(row,'Ekspor SRT',self.export);self.button(row,'Simpan proyek',self.save);self.load=self.button(row,'Buka proyek',self.load_project)
@@ -83,10 +85,26 @@ class Window(QMainWindow):
         self.table=QTableWidget(0,4);self.table.setHorizontalHeaderLabels(['Mulai (detik)','Akhir (detik)','Ucapan asli','Terjemahan']);self.table.horizontalHeader().setStretchLastSection(True);self.table.setColumnWidth(2,360);self.table.setColumnWidth(3,360);layout.addWidget(self.table)
         self.table.itemChanged.connect(self.edited);self.table.cellDoubleClicked.connect(self.jump)
         self.status=QLabel('Audio dikirim ke Google saat Anda menekan Buat subtitle online. Akurasi perlu ditinjau.');self.status.setWordWrap(True);layout.addWidget(self.status)
+        try:
+            self.key.setText(load_key('Gemini') or self.key.text());self.google.setText(load_key('GoogleTranslate') or self.google.text())
+        except Exception:pass
         self.timer=QTimer(self);self.timer.timeout.connect(self.tick);self.timer.start(100)
         self.setStyleSheet('QMainWindow,QWidget{background:#111827;color:#e5e7eb} QPushButton,QLineEdit,QComboBox,QSpinBox{padding:7px;background:#25334b;border:1px solid #41516c;border-radius:5px} QTableWidget{background:#172237} QPushButton:disabled{color:#6b7280}')
     def button(self,row,label,fn):
         b=QPushButton(label);b.clicked.connect(fn);row.addWidget(b);return b
+    def save_keys(self):
+        try:
+            if not self.key.text().strip():raise ValueError('Isi Gemini API key terlebih dahulu.')
+            save_key('Gemini',self.key.text().strip())
+            if self.google.text().strip():save_key('GoogleTranslate',self.google.text().strip())
+            else:delete_key('GoogleTranslate')
+            self.status.setText('API key disimpan di Windows Credential Manager dan akan terisi otomatis saat aplikasi dibuka lagi.')
+        except Exception as e:self.error(str(e))
+    def delete_keys(self):
+        try:
+            delete_key('Gemini');delete_key('GoogleTranslate');self.key.clear();self.google.clear()
+            self.status.setText('API key tersimpan telah dihapus.')
+        except Exception as e:self.error(str(e))
     def error(self,message): QMessageBox.warning(self,'LinguaPlayer',message)
     def open_video(self):
         p,_=QFileDialog.getOpenFileName(self,'Pilih video','','Semua file (*.*)')
@@ -171,7 +189,13 @@ if __name__=='__main__':
             def self_test():
                 try:
                     subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(),'-version'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
-                    output.write_text(json.dumps({'qt_window':'PASS','vlc_version':vlc.libvlc_get_version().decode(),'ffmpeg':'PASS'}),encoding='utf-8')
+                    import uuid
+                    test_name='SelfTest-'+str(uuid.uuid4())
+                    try:
+                        save_key(test_name,'temporary-test-value');assert load_key(test_name)=='temporary-test-value'
+                    finally:delete_key(test_name)
+                    assert load_key(test_name)==''
+                    output.write_text(json.dumps({'credential_manager':'PASS','qt_window':'PASS','vlc_version':vlc.libvlc_get_version().decode(),'ffmpeg':'PASS'}),encoding='utf-8')
                     w.close();app.exit(0)
                 except Exception as e:
                     output.write_text(json.dumps({'error':str(e)}),encoding='utf-8');app.exit(1)

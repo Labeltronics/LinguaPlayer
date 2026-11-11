@@ -28,7 +28,7 @@ Build memerlukan internet. VLC yang terpasang disalin utuh untuk mempertahankan 
 8. Ekspor SRT untuk offline. Mode Asli mengekspor transkrip; mode lain mengekspor terjemahan dengan fallback teks asli. SRT bilingual belum tersedia. Simpan proyek JSON untuk mempertahankan kedua teks dan lokasi video; tidak menyimpan key API.
 9. Untuk offline, taruh SRT bersama video dengan nama sama (film.mp4 dan film.srt), lalu buka menggunakan VLC. SRT tidak membakar teks ke video. Di aplikasi ini, buka video terlebih dahulu lalu tekan Buka SRT offline. Proyek JSON mempertahankan kedua bahasa; SRT dimuat sebagai teks satu bahasa.
 
-API key hanya disimpan dalam memori selama aplikasi berjalan (atau berasal dari environment GEMINI_API_KEY / GOOGLE_TRANSLATE_API_KEY). Jangan membagikan key atau memasukkannya ke repository. Audio sementara dihapus setelah pekerjaan selesai/gagal. Google menerapkan kebijakan data sesuai layanan/tier Anda.
+Tekan Simpan API key di Windows untuk menyimpannya melalui Windows Credential Manager. Key akan terisi otomatis pada akun Windows yang sama saat aplikasi dibuka kembali. Hapus key tersimpan menghapusnya. Jika tidak menekan Simpan, key hanya berada dalam memori selama aplikasi berjalan (atau berasal dari environment GEMINI_API_KEY / GOOGLE_TRANSLATE_API_KEY). Jangan membagikan key atau memasukkannya ke repository. Audio sementara dihapus setelah pekerjaan selesai/gagal. Google menerapkan kebijakan data sesuai layanan/tier Anda.
 
 ## Format/codec
 
