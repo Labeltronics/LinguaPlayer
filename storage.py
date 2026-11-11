@@ -68,13 +68,14 @@ class MediaStore:
     def relink(self,old_path,new_path):
         key=media_key(new_path);old_path=str(Path(old_path).resolve())
         if not self.persist:
-            entry=next(((k,v) for k,v in self.records.items() if v['path']==old_path),None)
+            entry=next(((k,v) for k,v in self.records.items() if os.path.normcase(str(Path(v['path']).resolve()))==os.path.normcase(old_path)),None)
             if not entry:raise ValueError('Riwayat lama tidak ditemukan.')
             if key in self.records and key!=entry[0]:raise ValueError('File tujuan sudah mempunyai riwayat.')
             record=self.records.pop(entry[0]);record['path']=str(Path(new_path).resolve());self.records[key]=record;return
         with self.session() as conn:
             conn.execute('BEGIN IMMEDIATE')
-            row=conn.execute('SELECT identity,data FROM media WHERE path=? ORDER BY updated DESC LIMIT 1',(old_path,)).fetchone()
+            rows=conn.execute('SELECT identity,data,path FROM media ORDER BY updated DESC').fetchall()
+            row=next((r for r in rows if os.path.normcase(str(Path(r[2]).resolve()))==os.path.normcase(old_path)),None)
             if not row:raise ValueError('Riwayat file lama tidak ditemukan.')
             if conn.execute('SELECT 1 FROM media WHERE identity=? AND identity!=?',(key,row[0])).fetchone():raise ValueError('File tujuan sudah mempunyai riwayat.')
             record=json.loads(row[1]);record['path']=str(Path(new_path).resolve());record['updated']=time.time()
