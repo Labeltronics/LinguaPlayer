@@ -222,10 +222,7 @@ class BrowserWindow(QDialog):
             if not ok:return
             quality=labels.index(selected)
         try:
-            record=self.manager.add(data['url'],data['name'],data['kind'],data.get('headers'),quality,private=self.private)
-            if record:
-                self.manager.providers[record['id']]=self.headers_for
-                if playlist:record['auto_playlist']=True
+            record=self.manager.add(data['url'],data['name'],data['kind'],data.get('headers'),quality,private=self.private,provider=self.headers_for,auto_playlist=playlist)
         except (ValueError,OSError) as exc:self.status.setText(str(exc))
     def queue_playlist(self):self.download_selected(True)
     def play_selected(self):

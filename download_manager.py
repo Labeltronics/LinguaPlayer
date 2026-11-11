@@ -25,7 +25,7 @@ class DownloadManager(QDialog):
         self.timer=QTimer(self);self.timer.timeout.connect(self.pump);self.timer.start(250);self.load();self.refresh()
     def record(self):
         i=self.table.currentRow();return self.records[i] if 0<=i<len(self.records) else None
-    def add(self,url,name='media.bin',kind='file',headers=None,quality=999,target=None,private=False):
+    def add(self,url,name='media.bin',kind='file',headers=None,quality=999,target=None,private=False,provider=None,auto_playlist=False):
         url=checked_url(url)
         if target is None:
             suffix='.mp4' if kind in ('hls','dash') else ''
@@ -35,7 +35,8 @@ class DownloadManager(QDialog):
         target=str(Path(target).resolve())
         if any(r['target']==target and r['status'] in ('Queued','Running','Paused') for r in self.records):raise ValueError('Tujuan ini masih dipakai unduhan lain.')
         rid=uuid.uuid4().hex;record={'id':rid,'target':target,'name':Path(target).name,'status':'Queued','kind':kind,'quality':quality,'connections':self.connections.value(),'priority':0,'private':bool(private or self.owner.private_session),'received':0,'total':0,'validator':'','target_stamp':target_stamp(target)}
-        self.records.append(record);self.urls[rid]=url;self.headers[rid]=dict(headers or {});
+        self.records.append(record);self.urls[rid]=url;self.headers[rid]=dict(headers or {});record['auto_playlist']=bool(auto_playlist)
+        if provider:self.providers[rid]=provider
         if not record['private']:self.save_url(rid,url)
         self.save();self.refresh();self.show();self.pump();return record
     def save_url(self,rid,url):

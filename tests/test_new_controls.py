@@ -42,7 +42,8 @@ class ControlsTests(unittest.TestCase):
         w=app.Window();manager=w.get_download_manager()
         try:
             with tempfile.TemporaryDirectory() as d:
-                record=manager.add('https://example.test/media.mp4','media.mp4',headers={'Cookie':'expired=session','Authorization':'fixture'},target=Path(d)/'media.mp4')
+                with patch.object(manager,'pump'):
+                    record=manager.add('https://example.test/media.mp4','media.mp4',headers={'Cookie':'expired=session','Authorization':'fixture'},target=Path(d)/'media.mp4')
                 manager.providers[record['id']]=lambda url:{'User-Agent':'fixture'}
                 with patch('download_manager.DownloadJob') as job:
                     manager.start(record);headers=job.call_args.args[2];self.assertNotIn('Cookie',headers);self.assertEqual(headers['Authorization'],'fixture')
