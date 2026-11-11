@@ -159,4 +159,6 @@ def run_playback_checks(window):
             if tuple(size)!=expected:raise RuntimeError('Upscale resolution mismatch')
             report['upscale_cpu'][resolution]={'status':'PASS','size':list(size)}
         report['gpu_export']={'physical_gpu_test':'NOT_PERFORMED_ON_CI','compiled_support':export_capabilities(ff)}
+        from extended_checks import run_extended_checks
+        report['extended']=run_extended_checks(window,Path(tmp),long_clip)
     return report

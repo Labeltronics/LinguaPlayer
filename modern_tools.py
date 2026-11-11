@@ -8,10 +8,12 @@ from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QComboBox,
 from themes import THEMES,validate_theme,stylesheet
 from subtitle_tools import parse_vtt,vtt,synchronize,quality_report
 
-class ModernTools:
+from advanced_addons import AdvancedAddons
+
+class ModernTools(AdvancedAddons):
     def setup_modern_tools(self):
         self.persistence_available=self.storage_enabled;self.theme_data=dict(THEMES['Cyber Neon']);self.settings=QSettings('Cyber80','Players')
-        self.background_job=None;self.tray=None;self.background_notice=None;self.audio_dsp='off';self.rotation='off';self.utility_job=None;self.sync_other=False;self.sync_offset=0.;self.private_session=False;self._last_cursor=None;self._cursor_time=time.monotonic()
+        self.last_attachment_subtitle=None;self.last_hardsub=None;self.background_job=None;self.tray=None;self.background_notice=None;self.audio_dsp='off';self.rotation='off';self.utility_job=None;self.sync_other=False;self.sync_offset=0.;self.private_session=False;self._last_cursor=None;self._cursor_time=time.monotonic()
         self.appearance_menu=self.menuBar().addMenu('Personalisasi')
         for name in THEMES:self.appearance_menu.addAction(name,lambda checked=False,n=name:self.select_theme(n))
         self.appearance_menu.addAction('Warna aksen…',self.choose_accent)
@@ -65,6 +67,7 @@ class ModernTools:
                 if raw:self.theme_data=validate_theme(json.loads(raw))
             except (ValueError,TypeError):pass
         self.setup_background_controls()
+        self.setup_addons()
         for dock in (self.subtitle_dock,self.studio_dock,self.sound_dock,self.stereo_dock):
             panel=dock.widget();scroll=QScrollArea();scroll.setWidgetResizable(True);scroll.setWidget(panel);scroll.setMinimumSize(240,120);dock.setWidget(scroll)
         self.apply_theme()
@@ -175,7 +178,7 @@ class ModernTools:
         self.overlay.setText(text);self.overlay.setGeometry(pos.x(),pos.y(),width,height);self.overlay.show();self.overlay.raise_()
     def modern_tick(self):
         if not hasattr(self,'overlay'):return
-        self.update_dual_sync()
+        self.addons_tick();self.update_dual_sync()
         cursor=QCursor.pos()
         if self._last_cursor!=cursor:self._last_cursor=cursor;self._cursor_time=time.monotonic()
         if self.pip:
@@ -286,6 +289,7 @@ class ModernTools:
         elif state==vlc.State.Paused and other_state==vlc.State.Playing:other.player.set_pause(1)
         if abs(other.speed_box.value()-self.speed_box.value())>.001:other.speed_box.setValue(self.speed_box.value())
     def modern_cleanup(self):
+        self.addons_cleanup()
         self.overlay.hide();self.overlay.close()
         if self.tray:self.tray.hide()
         if self.utility_job:self.utility_job.cancel();self.utility_job.wait(5000)
@@ -297,6 +301,10 @@ class ModernTools:
         self.attachment_start=QPushButton('Attachment video → subtitle di latar belakang');self.attachment_start.clicked.connect(self.start_background_subtitles);row.addWidget(self.attachment_start)
         self.attachment_cancel=QPushButton('Batalkan attachment');self.attachment_cancel.clicked.connect(self.cancel_background);self.attachment_cancel.setEnabled(False);row.addWidget(self.attachment_cancel)
         self.attachment_status=QLabel('Attachment mengirim video ke Google; hasil SRT tersimpan otomatis. Anda boleh menonton media lain/minimalkan aplikasi. Jangan tutup aplikasi sampai selesai.');self.attachment_status.setWordWrap(True);self.ai_panel.layout().addWidget(self.attachment_status)
+        row=QHBoxLayout();self.ai_panel.layout().addLayout(row)
+        self.hardsub_button=QPushButton('Gabungkan subtitle film aktif → Simpan video baru');self.hardsub_button.clicked.connect(self.burn_current_subtitle);row.addWidget(self.hardsub_button)
+        b=QPushButton('Gabungkan subtitle attachment terakhir');b.clicked.connect(self.burn_attachment_subtitle);row.addWidget(b)
+        b=QPushButton('Buka folder hasil subtitle/video');b.clicked.connect(self.open_hardsub_folder);row.addWidget(b)
         menu=self.menuBar().addMenu('Subtitle latar belakang');menu.addAction('Buat dari attachment video…',self.start_background_subtitles);menu.addAction('Batalkan pekerjaan',self.cancel_background)
     def start_background_subtitles(self):
         if self.background_job is not None:self.status.setText('Satu pekerjaan attachment masih berjalan.');return
@@ -321,15 +329,50 @@ class ModernTools:
     def cancel_background(self):
         if self.background_job:self.background_job.cancel();self.attachment_status.setText('Membatalkan attachment; permintaan aktif dapat menunggu timeout hingga 180 detik.')
     def background_complete(self,path,cues):
+        if self.background_job:self.last_attachment_subtitle={'source':self.background_job.source,'cues':list(cues),'path':path}
         message=f'Subtitle selesai dibuat: {len(cues)} cue.\n{path}'
         self.attachment_status.setText(message);self.status.setText(message)
         if self.background_job and self.path==self.background_job.source and not self.processing:
             self.fill(cues);self.cache_context=None
         if self.tray and QSystemTrayIcon.supportsMessages():self.tray.showMessage('Cyber80 • Subtitle selesai',message,QSystemTrayIcon.Information,10000)
         else:
-            self.background_notice=QMessageBox(self);self.background_notice.setWindowTitle('Subtitle selesai dibuat');self.background_notice.setTextFormat(Qt.PlainText);self.background_notice.setText(message);self.background_notice.open()
+            self.background_notice=QMessageBox(self);self.background_notice.setWindowTitle('Subtitle selesai dibuat');self.background_notice.setTextFormat(Qt.PlainText);self.background_notice.setText(message);self.background_notice.setStandardButtons(QMessageBox.Close)
+            burn=self.background_notice.addButton('Gabungkan → Video baru',QMessageBox.ActionRole);burn.clicked.connect(self.burn_attachment_subtitle)
+            self.background_notice.open()
     def background_failed(self,message):
         self.attachment_status.setText('Attachment gagal/dibatalkan: '+message);self.status.setText('Subtitle attachment belum selesai. Lihat panel Subtitle / AI.')
         if self.tray and QSystemTrayIcon.supportsMessages():self.tray.showMessage('Cyber80 • Subtitle belum selesai',message,QSystemTrayIcon.Warning,10000)
     def background_finished(self):
         self.background_job.deleteLater();self.background_job=None;self.attachment_start.setEnabled(True);self.attachment_cancel.setEnabled(False)
+
+    def burn_current_subtitle(self):
+        if not self.path or not self.cues:self.status.setText('Buka media dan buat/impor subtitle terlebih dahulu.');return
+        from core import Cue
+        shift=self.offset.value()/1000
+        cues=[Cue(max(0,c.start+shift),c.end+shift,c.source,c.target,c.language) for c in self.cues if c.end+shift>0]
+        self.start_hardsub(self.path,cues)
+    def burn_attachment_subtitle(self):
+        if not self.last_attachment_subtitle:self.status.setText('Belum ada subtitle attachment yang selesai.');return
+        self.start_hardsub(self.last_attachment_subtitle['source'],self.last_attachment_subtitle['cues'])
+    def start_hardsub(self,source,cues):
+        if self.utility_job is not None:self.status.setText('Tunggu pekerjaan alat media aktif selesai.');return
+        if not cues:self.status.setText('Tidak ada teks subtitle untuk digabungkan.');return
+        from player_extras import AUDIO_SUFFIXES
+        music=Path(source).suffix.lower() in AUDIO_SUFFIXES
+        target,_=QFileDialog.getSaveFileName(self,'Simpan video lirik baru' if music else 'Simpan video baru dengan hard subtitle',str(Path(source).with_suffix(''))+('_lyrics.mp4' if music else '_hardsub.mp4'),'MP4 (*.mp4)')
+        if not target:return
+        from media_jobs import UtilityJob
+        from core import srt
+        self.utility_job=UtilityJob(source,target,'Video lirik MP4' if music else 'Bakar subtitle MP4',subtitle_text=srt(cues))
+        self.utility_job.status.connect(self.status.setText);self.utility_job.failure.connect(self.error);self.utility_job.success.connect(self.hardsub_completed);self.utility_job.finished.connect(self.utility_finished);self.utility_job.start()
+    def hardsub_completed(self,path):
+        self.last_hardsub=path;self.status.setText('Video baru dengan subtitle selesai: '+path)
+        if self.tray:self.tray.showMessage('Cyber80 • Video subtitle selesai',Path(path).name,QSystemTrayIcon.Information,10000)
+        else:
+            self.background_notice=QMessageBox(self);self.background_notice.setWindowTitle('Video baru selesai');self.background_notice.setText('Video baru tersimpan: '+path);self.background_notice.setStandardButtons(QMessageBox.Close);button=self.background_notice.addButton('Buka folder',QMessageBox.ActionRole);button.clicked.connect(self.open_hardsub_folder);self.background_notice.open()
+    def open_hardsub_folder(self):
+        path=self.last_hardsub or (self.last_attachment_subtitle['path'] if self.last_attachment_subtitle else None)
+        if path:
+            from PySide6.QtGui import QDesktopServices
+            from PySide6.QtCore import QUrl
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(path).parent)))

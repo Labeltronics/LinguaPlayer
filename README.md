@@ -1,3 +1,7 @@
+# Pembaruan terbaru
+
+Lihat [Browser, Download, Cutting, Stereo TV, Zoom dan Hard Subtitle](CYBER80_BROWSER_3D_ID.md). Paket mencakup browser Chromium, model MiDaS ONNX dan runtime.
+
 # Cyber80 Players
 
 Windows video/audio player dengan subtitle AI, tema, playlist, PiP, dua pemain, EQ, 3D anaglyph dan ekspor HD/4K.

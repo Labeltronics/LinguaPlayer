@@ -42,7 +42,7 @@ class PlayerExtras(CinemaTools):
         action('Tambah film',self.add_films);action('Sebelumnya',lambda:self.next_film(-1));action('Berikutnya',lambda:self.next_film(1))
         action('Pemutar kedua',self.open_second_player);action('Fullscreen',self.toggle_fullscreen)
         self.mute_action=action('Mute',self.set_muted,True)
-        toolbar.addWidget(QLabel('  Kecepatan '));self.speed_box=QDoubleSpinBox();self.speed_box.setRange(.25,4);self.speed_box.setSingleStep(.25);self.speed_box.setDecimals(2);self.speed_box.setValue(1);self.speed_box.setSuffix(' ×');self.speed_box.valueChanged.connect(self.apply_speed);toolbar.addWidget(self.speed_box)
+        toolbar.addWidget(QLabel('  Kecepatan '));self.speed_box=QDoubleSpinBox();self.speed_box.setRange(.1,10);self.speed_box.setSingleStep(.25);self.speed_box.setDecimals(2);self.speed_box.setValue(1);self.speed_box.setSuffix(' ×');self.speed_box.valueChanged.connect(self.apply_speed);toolbar.addWidget(self.speed_box)
         self.stereo_dock=QDockWidget('3D anaglyph — kacamata merah / cyan atau biru',self);self.stereo_dock.setObjectName('stereo')
         controls=QWidget();form=QVBoxLayout(controls)
         row=QHBoxLayout();form.addLayout(row)
@@ -163,11 +163,13 @@ class PlayerExtras(CinemaTools):
             if self.pip is None:self.toggle_pip()
             if self.pip:self.pip.full_button.setText('Keluar fullscreen (Esc)');self.pip.showFullScreen()
     def toggle_stereo(self,enabled):
+        if enabled and getattr(self,'tv_active',False):self.tv_enable.setChecked(False)
         self.stereo_on=bool(enabled);self._last_frame_revision=-1;self._last_frame=None
         self.video.clear_frame();self.change_renderer(self.renderer.currentIndex())
     def configure_video_output(self):
-        if getattr(self,'stereo_on',False):
-            self.memory_video=MemoryVideo(self.player);self.video.setAttribute(Qt.WA_NoSystemBackground,False)
+        if getattr(self,'stereo_on',False) or self.canvas_active():
+            size=(960,540) if self.stereo_on or getattr(self,'tv_active',False) else (3840,2160)
+            self.memory_video=MemoryVideo(self.player,*size);self.video.setAttribute(Qt.WA_NoSystemBackground,False)
         else:
             self.memory_video=None;self.video.clear_frame();self.bind_video()
         try:self.player.video_set_key_input(False);self.player.video_set_mouse_input(False)
@@ -191,6 +193,8 @@ class PlayerExtras(CinemaTools):
         other.status.setText('Pemutar kedua siap. Suara awal mute; klik Mute untuk mengaktifkan suara.')
         return other
     def eventFilter(self,obj,event):
+        if event.type()==QEvent.Wheel and obj is self.video and hasattr(self,'wheel_seconds') and self.path:
+            self.handle_video_wheel(event.angleDelta().y());return True
         if event.type()==QEvent.KeyPress and QApplication.activeWindow() is not None and QApplication.activeWindow() in (self,getattr(self,'pip',None)):
             if event.key()==Qt.Key_O and event.modifiers() & Qt.ControlModifier:self.open_video();return True
             focused=QApplication.focusWidget()

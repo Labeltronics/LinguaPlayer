@@ -13,3 +13,6 @@ Sebelum distribusi publik, pertahankan seluruh file lisensi dependency dan sedia
 
 - NumPy: https://github.com/numpy/numpy — BSD-3-Clause dan lisensi komponen bawaan; lisensi di metadata distribusi yang dibundel.
 - Adapter layanan lokal mengikuti API Whisper.cpp (https://github.com/ggml-org/whisper.cpp) dan Ollama (https://github.com/ollama/ollama); server/model tidak dibundel dan mempunyai lisensi masing-masing.
+
+## Browser dan stereo depth
+Qt WebEngine/Chromium mengikuti lisensi Qt dan komponen Chromium dari distribusi PySide6; codec web tidak identik dengan VLC. ONNX Runtime/DirectML mengikuti lisensi distribusinya. MiDaS v2.1 small memakai MIT; lisensi, URL sumber dan checksum model disertakan di models/. Model asli: https://github.com/isl-org/MiDaS . Runtime: https://onnxruntime.ai/ . Tidak ada bobot model berbayar atau API key yang disertakan.

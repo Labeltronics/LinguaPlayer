@@ -10,7 +10,7 @@ if vlcdir.is_dir():
     os.environ['PATH']=str(vlcdir)+os.pathsep+os.environ.get('PATH','')
     if hasattr(os,'add_dll_directory'): DLL_HANDLE=os.add_dll_directory(str(vlcdir))
 import vlc, imageio_ffmpeg
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QUrl
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QUrl, QCoreApplication
 from PySide6.QtGui import QDesktopServices,QIcon
 from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,
     QFileDialog,QLabel,QLineEdit,QComboBox,QSlider,QTableWidget,QTableWidgetItem,QMessageBox,QSpinBox,QFrame,QDialog,QDockWidget)
@@ -19,6 +19,7 @@ from local_ai import transcribe_local
 from credentials import save_key, load_key, delete_key
 from stereo import VideoSurface
 from player_extras import PlayerExtras
+if QCoreApplication.instance() is None:QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
 
 class Job(QThread):
     progress=Signal(str)
@@ -79,6 +80,7 @@ class PictureWindow(QDialog):
         owner.button(controls,'Kembali ke pemutar',owner.leave_pip)
         self.setStyleSheet('QDialog{background:black} QPushButton{padding:7px}')
     def closeEvent(self,event):
+        if not self.addons_can_close():event.ignore();return
         if self.background_job is not None and self.background_job.isRunning():self.status.setText('Subtitle attachment masih berjalan. Minimalkan aplikasi, atau batalkan pekerjaan dan tunggu selesai sebelum menutup.');event.ignore();return
         event.ignore();self.returning.emit()
 
@@ -155,7 +157,7 @@ class Window(PlayerExtras,QMainWindow):
                 import ctypes
                 # Keep VLC decoder dependencies ahead of unrelated Qt/PyInstaller DLLs.
                 ctypes.windll.kernel32.SetDllDirectoryW(str(vlcdir))
-            if getattr(self,'stereo_on',False):options+=['--avcodec-hw=none','--vout=vmem']
+            if getattr(self,'stereo_on',False) or self.canvas_active():options+=['--avcodec-hw=none','--vout=vmem']
             elif mode==0:options+=['--avcodec-hw=none','--vout=wingdi']
             elif mode==2:options+=['--avcodec-hw=none','--vout=direct3d11']
             elif mode==3:options+=['--avcodec-hw=d3d11va','--vout=direct3d11']
@@ -172,7 +174,7 @@ class Window(PlayerExtras,QMainWindow):
         if engine is None:raise RuntimeError('VLC tidak dapat memuat plugin codec yang dibundel.')
         return engine
     def bind_video(self):
-        if getattr(self,'stereo_on',False):return
+        if getattr(self,'stereo_on',False) or self.canvas_active():return
         handle=int(self.video.winId())
         if sys.platform=='win32':self.player.set_hwnd(handle)
         elif sys.platform=='darwin':self.player.set_nsobject(handle)
@@ -226,6 +228,7 @@ class Window(PlayerExtras,QMainWindow):
         path=Path(path).resolve()
         if not path.is_file():raise ValueError('File video/audio tidak ditemukan.')
         self.record_position()
+        self.tv_generation+=1;self.tv_last_revision=-1;self.cues_4d=[]
         self.player.stop();self.path=str(path);self.pending_seek=None;self.pending_pause=False;self.playback_error_reported=False
         self.bind_video();self.player.set_media(self.engine.media_new_path(self.path))
         if self.player.play()==-1:raise RuntimeError('VLC gagal memulai video. Coba mode Kompatibel (CPU / GDI).')
@@ -381,6 +384,7 @@ class Window(PlayerExtras,QMainWindow):
                 self.open_path(data['video']);self.fill(cues);self.offset.setValue(int(data.get('offset_ms',0)))
             except Exception as e:self.error(str(e))
     def closeEvent(self,event):
+        if not self.addons_can_close():event.ignore();return
         if self.background_job is not None and self.background_job.isRunning():self.status.setText('Subtitle attachment masih berjalan. Minimalkan aplikasi, atau batalkan pekerjaan dan tunggu selesai sebelum menutup.');event.ignore();return
         if self.utility_job is not None and self.utility_job.isRunning():self.cancel_utility();self.status.setText('Membatalkan alat media; tutup lagi setelah selesai.');event.ignore();return
         if self.export_job is not None and self.export_job.isRunning():self.cancel_export();self.status.setText('Membatalkan ekspor; tutup lagi setelah proses selesai.');event.ignore();return
@@ -405,7 +409,9 @@ if __name__=='__main__':
                     assert load_key(test_name)==''
                     from playback_checks import run_playback_checks
                     playback=run_playback_checks(w)
-                    output.write_text(json.dumps({'playback':playback,'credential_manager':'PASS','qt_window':'PASS','vlc_version':vlc.libvlc_get_version().decode(),'ffmpeg':'PASS'}),encoding='utf-8')
+                    from browser_checks import run_browser_checks
+                    browser=run_browser_checks(w)
+                    output.write_text(json.dumps({'playback':playback,'browser':browser,'credential_manager':'PASS','qt_window':'PASS','vlc_version':vlc.libvlc_get_version().decode(),'ffmpeg':'PASS'}),encoding='utf-8')
                     w.close();app.exit(0)
                 except Exception as e:
                     output.write_text(json.dumps({'error':str(e)}),encoding='utf-8');app.exit(1)

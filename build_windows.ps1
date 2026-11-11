@@ -6,6 +6,11 @@ if ($LASTEXITCODE -ne 0) { throw 'Pasang Python 3.11/3.12 64-bit.' }
 $Python = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 & $Python -m pip install -r requirements.txt
 if ($LASTEXITCODE -ne 0) { throw 'Instalasi dependency gagal.' }
+New-Item -ItemType Directory -Force models | Out-Null
+$Model = Join-Path $PSScriptRoot 'models\midas-small.onnx'
+if (-not (Test-Path $Model)) { Invoke-WebRequest -Uri 'https://github.com/isl-org/MiDaS/releases/download/v2_1/model-small.onnx' -OutFile $Model }
+$ModelHash = (Get-FileHash $Model -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($ModelHash -ne '2d8c6cb8f415229daf1eb041024208e2608c9f98e17c81cc7c6ecb449c56fd58') { throw 'Checksum model kedalaman tidak cocok.' }
 & $Python make_icon.py
 if ($LASTEXITCODE -ne 0) { throw 'Pembuatan ikon gagal.' }
 & $Python -m unittest discover -s tests -v
@@ -13,11 +18,14 @@ if ($LASTEXITCODE -ne 0) { throw 'Tes gagal.' }
 $VlcDirectory = Join-Path $env:ProgramFiles 'VideoLAN\VLC'
 if ($env:LINGUAPLAYER_VLC_DIR) { $VlcDirectory = $env:LINGUAPLAYER_VLC_DIR }
 if (-not (Test-Path (Join-Path $VlcDirectory 'libvlc.dll'))) { throw 'Pasang VLC Windows 64-bit resmi dahulu, atau set LINGUAPLAYER_VLC_DIR.' }
-& $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name Cyber80Players --icon assets/cyber80.ico --add-data "assets;assets" --collect-all imageio_ffmpeg --add-data "${VlcDirectory};vlc" app.py
+& $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name Cyber80Players --icon assets/cyber80.ico --add-data "assets;assets" --collect-all imageio_ffmpeg --collect-all onnxruntime --add-data "models;models" --add-data "${VlcDirectory};vlc" app.py
 if ($LASTEXITCODE -ne 0) { throw 'Build gagal.' }
+& $Python bundle_licenses.py
+if ($LASTEXITCODE -ne 0) { throw 'Penyalinan lisensi gagal.' }
 Copy-Item QUICK_START_ID.txt dist\Cyber80Players\
 Copy-Item AUDIT_CYBER80_PLAYERS_ID.md dist\Cyber80Players\
 Copy-Item PEMBARUAN_CYBER80_ID.md dist\Cyber80Players\
+Copy-Item CYBER80_BROWSER_3D_ID.md dist\Cyber80Players\
 Copy-Item AI_LOKAL_ID.md dist\Cyber80Players\
 Copy-Item LICENSE dist\Cyber80Players\
 Copy-Item README_ID.md dist\Cyber80Players\

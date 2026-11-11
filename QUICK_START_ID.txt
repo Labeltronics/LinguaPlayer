@@ -1,3 +1,13 @@
+CYBER80 HUB — MODUL TERBARU
+Browser multimedia / browser privat: buka situs, tekan Play, pilih Media terdeteksi > Download media.
+Download Manager: pause/resume, antrean, batas kecepatan, kualitas, SHA256 dan folder hasil.
+Cutting visual: video preview, tandai awal/akhir, daftar potongan, ekspor video/audio.
+3D / 4D Cinema: stereo AI atau SBS/TB asli, pilih output TV yang cocok. 4D cue hanya preview, bukan hardware.
+Zoom / Speed / Capture: zoom 0,10%–1000%, peningkatan resolusi biasa Full HD/4K, reset, capture. Speed 0,1×–10×.
+Scroll video atas +5 detik / bawah −5 detik; ubah di Atur scroll seek.
+Subtitle / AI: setelah selesai, Gabungkan subtitle > Simpan video baru; musik menjadi video lirik.
+Baca CYBER80_BROWSER_3D_ID.md untuk fitur dan batasan lengkap.
+
 PEMBARUAN MODERN + SUBTITLE ATTACHMENT
 Baca PEMBARUAN_CYBER80_ID.md untuk seluruh perubahan dan batas pengujian.
 Personalisasi: tema/skin, aksen, simpan layout dan mode sederhana.

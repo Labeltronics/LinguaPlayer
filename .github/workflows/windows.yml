@@ -8,7 +8,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -24,6 +24,8 @@ jobs:
         shell: pwsh
         run: Rename-Item "${env:ProgramFiles}\VideoLAN\VLC" "VLC-system-disabled"
       - name: Test packaged EXE startup
+        env:
+          QTWEBENGINE_CHROMIUM_FLAGS: --disable-gpu
         shell: pwsh
         run: |
           $p = Start-Process dist\Cyber80Players\Cyber80Players.exe -ArgumentList '--self-test', "$env:RUNNER_TEMP\lingua-test.json" -PassThru -Wait

@@ -151,7 +151,7 @@ class CinemaTools(ModernTools):
             self.ab_b=position;self.status.setText('Loop A–B aktif. Tekan A–B untuk menghapus loop.')
         else:self.ab_a=None;self.ab_b=None;self.status.setText('Loop A–B dimatikan.')
     def capture_frame(self,path):
-        if self.stereo_on and self.video.image is not None:
+        if (self.stereo_on or self.canvas_active()) and self.video.image is not None:
             if not self.video.image.save(path):raise RuntimeError('Gambar tidak dapat disimpan.')
         elif self.player.video_take_snapshot(0,str(path),0,0)==-1:raise RuntimeError('Snapshot video tidak tersedia.')
     def capture_dialog(self):

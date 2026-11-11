@@ -5,3 +5,8 @@ dist/
 *.spec
 .env
 *.key
+
+models/*.onnx
+run_browser_local.py
+*.part
+*.segments/

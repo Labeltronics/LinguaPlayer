@@ -13,6 +13,6 @@ class UtilityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             source=Path(d)/'source.mp4'
             subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','color=blue:size=160x120:duration=2','-f','lavfi','-i','sine=frequency=440:duration=2','-c:v','libx264','-c:a','aac','-shortest',str(source)],check=True,**flags)
-            for kind,extension in [('Potong klip MP4','mp4'),('Ekstrak audio WAV','wav'),('Ekstrak audio MP3','mp3'),('Normalisasi audio WAV','wav'),('Remux MKV','mkv'),('Bakar subtitle MP4','mp4')]:
+            for kind,extension in [('Potong klip MP4','mp4'),('Ekstrak audio WAV','wav'),('Ekstrak audio MP3','mp3'),('Normalisasi audio WAV','wav'),('Remux MKV','mkv'),('Bakar subtitle MP4','mp4'),('Video lirik MP4','mp4'),('Potong klip audio M4A','m4a')]:
                 with self.subTest(kind=kind):
                     target=Path(d)/(kind+'.'+extension);job=UtilityJob(source,target,kind,0,1,'1\n00:00:00,000 --> 00:00:01,000\nHalo\n');errors=[];done=[];job.failure.connect(errors.append);job.success.connect(done.append);job.run();self.assertFalse(errors);self.assertTrue(done);self.assertGreater(target.stat().st_size,100)

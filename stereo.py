@@ -40,31 +40,36 @@ def compose_anaglyph(frame,red=0,blue=0,layout='2d',scheme='red-cyan',swap=False
 
 class VideoSurface(QFrame):
     def __init__(self):
-        super().__init__();self.image=None;self.audio_title='';self.setFocusPolicy(Qt.StrongFocus)
+        super().__init__();self.image=None;self.zoom_factor=1.;self.upscale_size=None;self.upscaled=None;self.audio_title='';self.setFocusPolicy(Qt.StrongFocus)
     def paintEvent(self,event):
         if self.image is None:
             if self.audio_title:
                 painter=QPainter(self);painter.fillRect(self.rect(),QColor('black'));painter.setPen(QColor('#75d8ff'));painter.drawText(self.rect(),Qt.AlignCenter|Qt.TextWordWrap,self.audio_title+'\nAudio Studio / Equalizer');return
             return super().paintEvent(event)
         painter=QPainter(self);painter.fillRect(self.rect(),QColor('black'))
-        size=self.image.size().scaled(self.size(),Qt.KeepAspectRatio)
-        x=(self.width()-size.width())//2;y=(self.height()-size.height())//2
-        painter.drawImage(x,y,self.image.scaled(size,Qt.KeepAspectRatio,Qt.FastTransformation))
+        image=self.upscaled or self.image
+        size=image.size().scaled(self.size(),Qt.KeepAspectRatio)
+        width=max(1,round(size.width()*self.zoom_factor));height=max(1,round(size.height()*self.zoom_factor))
+        from PySide6.QtCore import QRectF
+        painter.setRenderHint(QPainter.SmoothPixmapTransform,True)
+        painter.drawImage(QRectF((self.width()-width)/2,(self.height()-height)/2,width,height),image)
     def show_frame(self,array):
         h,w,_=array.shape
-        self.image=QImage(array.data,w,h,w*4,QImage.Format_RGB32).copy();self.update()
-    def clear_frame(self):self.image=None;self.update()
+        self.image=QImage(array.data,w,h,w*4,QImage.Format_RGB32).copy()
+        self.upscaled=self.image.scaled(*self.upscale_size,Qt.KeepAspectRatio,Qt.SmoothTransformation) if self.upscale_size else None
+        self.update()
+    def clear_frame(self):self.image=None;self.upscaled=None;self.update()
 
 class MemoryVideo:
     """Keep callbacks and frame storage alive for the lifetime of the VLC player."""
-    def __init__(self,player):
+    def __init__(self,player,max_width=960,max_height=540):
         self.lock=threading.Lock();self.width=0;self.height=0;self.buffer=None;self.latest=None;self.frame_count=0;self.revision=0
         # char* must stay a writable pointer; c_char_p would turn it into Python bytes.
         FormatCallback=ctypes.CFUNCTYPE(ctypes.c_uint,ctypes.POINTER(ctypes.c_void_p),ctypes.POINTER(ctypes.c_char),ctypes.POINTER(ctypes.c_uint),ctypes.POINTER(ctypes.c_uint),ctypes.POINTER(ctypes.c_uint),ctypes.POINTER(ctypes.c_uint))
         @FormatCallback
         def setup(opaque,chroma,width,height,pitches,lines):
             try:
-                scale=min(1.,960/max(1,width[0]),540/max(1,height[0]))
+                scale=min(1.,max_width/max(1,width[0]),max_height/max(1,height[0]))
                 w=max(16,int(width[0]*scale)//16*16);h=max(2,int(height[0]*scale))
                 with self.lock:
                     self.width=w;self.height=h;size=w*h*4
