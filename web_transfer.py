@@ -25,7 +25,8 @@ class GuardedRedirect(urllib.request.HTTPRedirectHandler):
 
 def open_http(url,headers=None,method='GET',timeout=20):
     req=urllib.request.Request(checked_url(url),headers={**safe_headers(headers),'Accept-Encoding':'identity'},method=method)
-    return urllib.request.build_opener(GuardedRedirect()).open(req,timeout=timeout)
+    from network_preferences import urllib_proxy_handler
+    return urllib.request.build_opener(urllib_proxy_handler(),GuardedRedirect()).open(req,timeout=timeout)
 def scoped_headers(source,url,headers):return safe_headers(headers) if origin(source)==origin(url) else {k:v for k,v in safe_headers(headers).items() if k.lower() not in SENSITIVE}
 def read_document(url,headers=None,limit=2*1024*1024):
     with open_http(url,headers) as response:

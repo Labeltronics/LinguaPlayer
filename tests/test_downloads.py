@@ -23,6 +23,8 @@ class Server:
                 data=DATA;mime='video/mp4'
                 if outer.folder and (outer.folder/path.lstrip('/')).is_file():
                     data=(outer.folder/path.lstrip('/')).read_bytes();mime='application/vnd.apple.mpegurl' if path.endswith('.m3u8') else 'application/dash+xml' if path.endswith('.mpd') else 'text/html' if path.endswith('.html') else 'video/webm' if path.endswith('.webm') else 'audio/wav' if path.endswith('.wav') else 'application/octet-stream'
+                elif outer.folder:
+                    self.send_error(404);return
                 etag='"new"' if path=='/changed' else '"fixture"';a=0;b=len(data)-1;status=200
                 if self.headers.get('Range') and path!='/norange':
                     import re
@@ -107,6 +109,6 @@ class ManifestTests(unittest.TestCase):
             try:
                 for kind,manifest in [('hls','test.m3u8'),('dash','test.mpd')]:
                     with self.subTest(kind=kind):
-                        target=root/(kind+'_out.mp4');job=DownloadJob(record(target,kind=kind),server.base+'/'+manifest);result,_=run(job);self.assertEqual(result[0],'Completed',(result,getattr(job,'ffmpeg_error','')))
+                        target=root/(kind+'_out.mp4');job=DownloadJob(record(target,kind=kind),server.base+'/'+manifest);result,_=run(job);self.assertEqual(result[0],'Completed',(result,getattr(job,'ffmpeg_error',''),(root/manifest).read_text(),[(p.name,p.stat().st_size) for p in root.iterdir() if p.is_file()],[p for _,p,_ in server.requests]))
                         reader=imageio_ffmpeg.read_frames(str(target));meta=next(reader);reader.close();self.assertEqual(meta['size'],(160,120));self.assertTrue(meta.get('audio_codec'))
             finally:server.close()

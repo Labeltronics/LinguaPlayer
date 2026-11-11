@@ -2,7 +2,7 @@
 import json,urllib.parse,time,re
 from pathlib import Path
 from PySide6.QtCore import Qt,QUrl,QTimer,QObject,Signal,QRunnable,QThreadPool
-from PySide6.QtWidgets import (QDialog,QVBoxLayout,QHBoxLayout,QPushButton,QLineEdit,QTabWidget,QSplitter,QWidget,QTableWidget,QTableWidgetItem,QLabel,QInputDialog,QFileDialog,QMessageBox,QAbstractItemView)
+from PySide6.QtWidgets import (QDialog,QVBoxLayout,QHBoxLayout,QPushButton,QLineEdit,QTabWidget,QSplitter,QWidget,QTableWidget,QTableWidgetItem,QLabel,QInputDialog,QFileDialog,QMessageBox,QAbstractItemView,QCheckBox,QComboBox,QSpinBox,QFormLayout,QDialogButtonBox)
 from PySide6.QtWebEngineCore import QWebEnginePage,QWebEngineProfile,QWebEngineSettings,QWebEngineUrlRequestInterceptor,QWebEngineUrlRequestInfo
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from web_transfer import checked_url,origin,safe_headers,inspect_media,read_document,MEDIA_EXT,atomic_json
@@ -39,9 +39,19 @@ class Probe(QRunnable):
             if c.get('known'):self.signals.ready.emit({'url':c['url'],'name':Path(urllib.parse.urlsplit(c['url']).path).name or 'Media','mime':'belum terkonfirmasi','size':None,'kind':'hls' if urllib.parse.urlsplit(c['url']).path.lower().endswith('.m3u8') else 'dash' if urllib.parse.urlsplit(c['url']).path.lower().endswith('.mpd') else 'file','media':True,'headers':c.get('headers',{}),'qualities':[],'warning':'Metadata belum tersedia; akses/format mungkin dibatasi.'})
             else:self.signals.ready.emit({'media':False})
 class WebPage(QWebEnginePage):
+    def __init__(self,profile,view):super().__init__(profile,view);self.browser=view.browser;self.rewrites=[]
     def acceptNavigationRequest(self,url,kind,main):
         if url.scheme()=='about':return True
-        try:checked_url(url.toString());return True
+        try:
+            value=checked_url(url.toString())
+            from network_preferences import google_safe_url
+            target=google_safe_url(value,self.browser.safe_search_off.isChecked())
+            if target!=value and main:
+                now=time.monotonic();self.rewrites=[v for v in self.rewrites if now-v<10]
+                if len(self.rewrites)<3:
+                    self.rewrites.append(now);QTimer.singleShot(0,lambda:self.load(QUrl(target)));return False
+                self.browser.status.setText('Google/jaringan memaksakan SafeSearch; pengaturan akun/jaringan dapat mengunci preferensi Off.')
+            return True
         except ValueError:return False
     def javaScriptConsoleMessage(self,*args):pass
 class WebView(QWebEngineView):
@@ -49,7 +59,9 @@ class WebView(QWebEngineView):
     def createWindow(self,kind):return self.browser.add_tab('about:blank')
 class BrowserWindow(QDialog):
     def __init__(self,owner,private=False):
-        super().__init__(owner,Qt.Window);self.owner=owner;self.private=private;self.manager=owner.get_download_manager();self.setWindowTitle('Cyber80 Browser'+(' • Privat' if private else ''));self.resize(1250,850)
+        super().__init__(owner,Qt.Window);self.owner=owner;self.private=private;self.manager=owner.get_download_manager();
+        from network_preferences import initialize
+        initialize(owner.persistence_available);self.setWindowTitle('Cyber80 Browser'+(' • Privat' if private else ''));self.resize(1250,850)
         self.profile=QWebEngineProfile(self) if private or not owner.storage_enabled else QWebEngineProfile(f'Cyber80Browser-{owner.window_number}',self)
         if not self.profile.isOffTheRecord():
             folder=owner.log_path.parent/'browser'/str(owner.window_number);self.profile.setPersistentStoragePath(str(folder/'profile'));self.profile.setCachePath(str(folder/'cache'))
@@ -67,6 +79,8 @@ class BrowserWindow(QDialog):
         self.address=QLineEdit();self.address.setPlaceholderText('Alamat web atau pencarian …');self.address.returnPressed.connect(self.navigate);row.addWidget(self.address,1)
         for text,fn in [('Buka',self.navigate),('Download',lambda:self.manager.show()),('Hapus data',self.clear_data)]:
             b=QPushButton(text);b.clicked.connect(fn);row.addWidget(b)
+        row=QHBoxLayout();box.addLayout(row);self.safe_search_off=QCheckBox('Google SafeSearch: Off');self.safe_search_off.setChecked(owner.settings.value('google_safe_off',True,type=bool));self.safe_search_off.toggled.connect(self.save_search_preference);row.addWidget(self.safe_search_off)
+        button=QPushButton('Proxy / akses jaringan');button.clicked.connect(self.proxy_settings);row.addWidget(button);row.addWidget(QLabel('Tidak ada filter konten aplikasi. Blokir ISP/akun tetap bergantung koneksi/proxy yang berfungsi.'));row.addStretch()
         self.tabs=QTabWidget();self.tabs.setTabsClosable(True);self.tabs.tabCloseRequested.connect(self.close_tab);self.tabs.currentChanged.connect(self.tab_changed)
         split=QSplitter(Qt.Vertical);split.addWidget(self.tabs);panel=QWidget();pbox=QVBoxLayout(panel);row=QHBoxLayout();pbox.addLayout(row)
         row.addWidget(QLabel('Media terdeteksi • pilih media lalu Download'))
@@ -102,9 +116,29 @@ class BrowserWindow(QDialog):
         value=self.address.text().strip()
         if not value:return
         if '://' not in value and '.' in value and not any(c.isspace() for c in value):value='https://'+value
-        elif '://' not in value:value='https://duckduckgo.com/?q='+urllib.parse.quote(value)
+        elif '://' not in value:
+            from network_preferences import google_search_url
+            value=google_search_url(value,self.safe_search_off.isChecked())
         try:self.current().setUrl(QUrl(checked_url(value)))
         except ValueError as exc:self.status.setText(str(exc))
+    def save_search_preference(self,value):
+        if not self.private and self.owner.storage_enabled:self.owner.settings.setValue('google_safe_off',value)
+        self.status.setText('Preferensi SafeSearch diterapkan pada pencarian Google berikutnya. Google/administrator dapat menguncinya.')
+    def proxy_settings(self):
+        from network_preferences import current,configure,apply_qt,save_private_configuration
+        data=current();dialog=QDialog(self);dialog.setWindowTitle('Proxy browser & Download Manager • seluruh proses');form=QFormLayout(dialog);mode=QComboBox()
+        for label,key in [('Ikuti proxy sistem / VPN Windows','system'),('Langsung tanpa proxy','direct'),('Proxy HTTP/HTTPS CONNECT','http')]:mode.addItem(label,key)
+        mode.setCurrentIndex(max(0,mode.findData(data['mode'])));host=QLineEdit(data['host']);port=QSpinBox();port.setRange(1,65535);port.setValue(data['port']);user=QLineEdit(data['username']);password=QLineEdit(data['password']);password.setEchoMode(QLineEdit.Password)
+        for label,widget in [('Mode',mode),('Host/IP',host),('Port',port),('Username opsional',user),('Password opsional',password)]:form.addRow(label,widget)
+        note=QLabel('Gunakan proxy yang Anda percaya. Tidak ada server proxy/VPN gratis bawaan. Berlaku untuk browser dan koneksi HTTP downloader baru dalam proses ini. Verifikasi HTTPS dan sandbox tetap aktif.');note.setWordWrap(True);form.addRow(note)
+        remember=QCheckBox('Simpan aman di Windows Credential Manager');remember.setEnabled(self.owner.storage_enabled and not self.private);form.addRow(remember)
+        buttons=QDialogButtonBox(QDialogButtonBox.Ok|QDialogButtonBox.Cancel);buttons.accepted.connect(dialog.accept);buttons.rejected.connect(dialog.reject);form.addRow(buttons)
+        if dialog.exec()==QDialog.Accepted:
+            try:
+                configure(mode.currentData(),host.text(),port.value(),user.text(),password.text());apply_qt()
+                if remember.isChecked():save_private_configuration()
+                self.status.setText('Proxy diterapkan pada koneksi baru. Muat ulang tab; tidak menjamin semua blokir jaringan dapat dilewati.')
+            except Exception:self.status.setText('Konfigurasi proxy tidak sah atau tidak dapat disimpan aman.')
     def save(self):
         if not self.private and self.owner.storage_enabled:
             try:atomic_json(self.store,{'bookmarks':self.bookmarks,'history':self.history})
