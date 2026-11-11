@@ -411,6 +411,8 @@ if __name__=='__main__':
                     assert load_key(test_name)==''
                     from playback_checks import run_playback_checks
                     playback=run_playback_checks(w)
+                    from studio_checks import run_studio_checks
+                    with tempfile.TemporaryDirectory(prefix='cyber80-studio-test-') as studio_root:playback['video_studio']=run_studio_checks(w,Path(studio_root))
                     from browser_checks import run_browser_checks
                     browser=run_browser_checks(w)
                     output.write_text(json.dumps({'playback':playback,'browser':browser,'credential_manager':'PASS','qt_window':'PASS','vlc_version':vlc.libvlc_get_version().decode(),'ffmpeg':'PASS'}),encoding='utf-8')

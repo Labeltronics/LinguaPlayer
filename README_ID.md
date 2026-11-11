@@ -15,3 +15,7 @@ Workflow GitHub Actions membangun pada Windows, menonaktifkan VLC sistem setelah
 Gunakan proyek Gemini Free Tier tanpa billing. Aplikasi tidak dapat mengonfirmasi status billing hanya dari API key, dan tidak mengaktifkan layanan berbayar. Mesin AI lokal membutuhkan server dan model yang dipasang terpisah. Akurasi 100%, seluruh codec, zero latency, HDR fisik, akselerasi pada semua GPU, dan aplikasi bebas cacat tidak dijanjikan. Semua efek playback meninggalkan file asli; ekspor membuat file baru.
 
 Dependensi dan lisensi ada pada THIRD_PARTY.md serta berkas lisensi yang dibundel. Produk belum memiliki code signing, installer dan pembaruan otomatis.
+
+## Editor video multilayer
+
+Buka Cyber80 Hub → Video Studio. Panduan: [VIDEO_STUDIO_ID.md](VIDEO_STUDIO_ID.md). Prompt/spesifikasi pengembangan: [PROMPT_VIDEO_STUDIO_ID.md](PROMPT_VIDEO_STUDIO_ID.md). Lihat batas edisi pertama dan laporan EXE sebelum menganggap setara seluruh fitur Filmora.

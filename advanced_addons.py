@@ -6,13 +6,13 @@ from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButto
 from depth_stereo import StereoWorker,StereoExport,DEFAULT_MODEL
 class AdvancedAddons:
     def setup_addons(self):
-        self.download_manager=None;self.browsers=[];self.cut_editor=None;self.tv_active=False;self.tv_worker=None;self.tv_export=None;self.tv_generation=0;self.tv_last_revision=-1;self.wheel_remainder=0;self.wheel_hook=None
+        self.download_manager=None;self.browsers=[];self.cut_editor=None;self.video_studio=None;self.tv_active=False;self.tv_worker=None;self.tv_export=None;self.tv_generation=0;self.tv_last_revision=-1;self.wheel_remainder=0;self.wheel_hook=None
         self.wheel_seconds=5
         if self.storage_enabled:
             try:self.wheel_seconds=max(1,min(300,int(self.settings.value('wheel_seconds',5))))
             except (ValueError,TypeError):pass
         menu=self.menuBar().addMenu('Cyber80 Hub')
-        for title,fn in [('Browser multimedia • Privat',lambda:self.open_browser(True)),('Browser normal (opsional)',lambda:self.open_browser(False)),('Download Manager',lambda:self.get_download_manager().show()),('Koleksi media',self.show_collection),('Cutting visual',self.open_cut_editor),('3D / 4D Cinema',self.show_tv),('Atur scroll seek',self.set_wheel_seconds)]:menu.addAction(title,fn)
+        for title,fn in [('Browser multimedia • Privat',lambda:self.open_browser(True)),('Browser normal (opsional)',lambda:self.open_browser(False)),('Download Manager',lambda:self.get_download_manager().show()),('Video Studio • Editor multilayer',lambda:self.open_video_studio()),('Koleksi media',self.show_collection),('Cutting visual',self.open_cut_editor),('3D / 4D Cinema',self.show_tv),('Atur scroll seek',self.set_wheel_seconds)]:menu.addAction(title,fn)
         self.tv_dock=QDockWidget('3D TV / Depth AI / 4D cue preview',self);self.tv_dock.setObjectName('tv3d');panel=QWidget();box=QVBoxLayout(panel)
         row=QHBoxLayout();box.addLayout(row);self.tv_enable=QCheckBox('Aktifkan stereo TV (bukan anaglyph)');row.addWidget(self.tv_enable)
         self.tv_input=QComboBox()
@@ -76,6 +76,12 @@ class AdvancedAddons:
         browser=next((b for b in self.browsers if b.private==private),None)
         if browser is None:browser=BrowserWindow(self,private or self.private_session);self.browsers.append(browser)
         browser.showNormal();browser.raise_();browser.activateWindow();return browser
+    def open_video_studio(self,import_current=True):
+        if self.video_studio is None or self.video_studio.released:
+            from video_editor import VideoStudio
+            self.video_studio=VideoStudio(self)
+            if import_current and self.path:self.video_studio.import_paths([self.path])
+        self.video_studio.showNormal();self.video_studio.raise_();self.video_studio.activateWindow();return self.video_studio
     def open_cut_editor(self):
         if not self.path:self.status.setText('Buka video/audio lokal terlebih dahulu.');return
         if self.cut_editor and not self.cut_editor.released:self.cut_editor.showNormal();self.cut_editor.raise_();return self.cut_editor
@@ -152,6 +158,13 @@ class AdvancedAddons:
         t=max(0,self.player.get_time())/1000;active=[c for c in self.cues_4d if c['start']<=t<c['start']+c['duration']]
         self.cue_4d_label.setText('4D preview: '+', '.join(f'{c["effect"]} {c["intensity"]}%' for c in active) if active else '4D: tidak ada cue aktif (preview saja)')
     def addons_can_close(self):
+        studio=getattr(self,'video_studio',None)
+        if studio and not studio.released:
+            if studio.import_job:studio.import_job.requestInterruption();self.status.setText('Menunggu impor Video Studio selesai.');return False
+            if studio.job:studio.cancel();self.status.setText('Menunggu render Video Studio selesai.');return False
+            studio.close()
+            if not studio.released:return False
+
         if self.snapshot_job is not None and self.snapshot_job.isRunning():self.snapshot_job.cancel();self.status.setText('Menunggu capture frame selesai.');return False
         if self.download_manager and self.download_manager.active():self.status.setText('Jeda/batalkan unduhan dan tunggu koneksi berhenti sebelum menutup. Browser boleh disembunyikan.');return False
         if self.cut_editor and self.cut_editor.job is not None:self.cut_editor.cancel_export();self.status.setText('Menunggu pembatalan cutting selesai.');return False
