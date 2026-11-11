@@ -72,6 +72,6 @@ class ModernTests(unittest.TestCase):
         try:
             w.subtitle.setText('Subtitle Indonesia');w.video.audio_title=''
             with patch.object(app.Window,'isActiveWindow',return_value=True):w.update_overlay()
-            self.assertTrue(w.overlay.testAttribute(Qt.WA_TransparentForMouseEvents));self.assertEqual(w.overlay.text(),'Subtitle Indonesia');self.assertLessEqual(w.overlay.width(),w.video.width());self.assertFalse(w.overlay.isHidden())
+            self.assertTrue(w.overlay.windowFlags() & Qt.WindowStaysOnTopHint);self.assertTrue(w.overlay.testAttribute(Qt.WA_TransparentForMouseEvents));self.assertEqual(w.overlay.text(),'Subtitle Indonesia');self.assertLessEqual(w.overlay.width(),w.video.width());self.assertFalse(w.overlay.isHidden())
             w.toggle_overlay(False);self.assertTrue(w.overlay.isHidden())
         finally:w.close();q.processEvents()

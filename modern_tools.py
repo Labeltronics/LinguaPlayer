@@ -27,7 +27,7 @@ class ModernTools:
         row.addWidget(QLabel('Track sumber AI (0 = pertama)'));self.ai_stream=QSpinBox();self.ai_stream.setRange(0,31);self.ai_stream.setToolTip('Nomor urut audio FFmpeg, bukan ID track VLC. Gunakan Info track AI untuk memeriksa.');row.addWidget(self.ai_stream)
         b=QPushButton('Info track AI');b.clicked.connect(self.show_ai_tracks);row.addWidget(b)
         label=QLabel('30 detik mengurangi jumlah permintaan; bukan jaminan real-time. Mode siapkan dahulu tetap pause sampai Anda menekan Play. Track AI dipilih terpisah dari track pemutaran.');label.setWordWrap(True);self.ai_panel.layout().insertWidget(2,label)
-        self.overlay=QLabel(self,Qt.Tool|Qt.FramelessWindowHint|Qt.WindowDoesNotAcceptFocus)
+        self.overlay=QLabel(self,Qt.Tool|Qt.FramelessWindowHint|Qt.WindowDoesNotAcceptFocus|Qt.WindowStaysOnTopHint)
         self.overlay.setAttribute(Qt.WA_TransparentForMouseEvents);self.overlay.setAttribute(Qt.WA_ShowWithoutActivating);self.overlay.setAttribute(Qt.WA_TranslucentBackground)
         self.overlay.setWordWrap(True);self.overlay.setAlignment(Qt.AlignCenter);self.overlay.setTextFormat(Qt.PlainText)
         shadow=QGraphicsDropShadowEffect();shadow.setBlurRadius(5);shadow.setOffset(1,2);shadow.setColor(QColor('black'));self.overlay.setGraphicsEffect(shadow)
