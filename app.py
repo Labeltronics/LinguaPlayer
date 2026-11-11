@@ -114,7 +114,8 @@ class Window(PlayerExtras,QMainWindow):
         render_row=QHBoxLayout();layout.addLayout(render_row);render_row.addWidget(self.renderer);render_row.addStretch()
         self.button(render_row,'Log video',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.log_path))))
         self.seek=QSlider(Qt.Horizontal); self.seek.setRange(0,1000); self.seek.sliderReleased.connect(lambda:self.player.set_position(self.seek.value()/1000)); row.addWidget(self.seek,1)
-        volume=QSlider(Qt.Horizontal); volume.setRange(0,100); volume.setValue(80); volume.setMaximumWidth(100); volume.valueChanged.connect(lambda value:self.player.audio_set_volume(value)); row.addWidget(QLabel('Volume'));row.addWidget(volume);self.player.audio_set_volume(80);self.volume=volume
+        volume=QSlider(Qt.Horizontal); volume.setRange(0,200); volume.setValue(100); volume.setMaximumWidth(120); volume.valueChanged.connect(lambda value:self.player.audio_set_volume(value)); row.addWidget(QLabel('Volume'));row.addWidget(volume);self.player.audio_set_volume(100);self.volume=volume
+        self.volume_percent=QSpinBox();self.volume_percent.setRange(0,200);self.volume_percent.setValue(100);self.volume_percent.setSuffix(' %');volume.valueChanged.connect(self.volume_percent.setValue);self.volume_percent.valueChanged.connect(volume.setValue);row.addWidget(self.volume_percent);self.button(row,'BOOST Maks',lambda:self.audio_panel.boost_preset(20))
         self.ai_panel=QWidget();ai_layout=QVBoxLayout(self.ai_panel)
         row=QHBoxLayout();ai_layout.addLayout(row)
         self.key=QLineEdit(os.getenv('GEMINI_API_KEY',''));self.key.setEchoMode(QLineEdit.Password);self.key.setPlaceholderText('Gemini API key');row.addWidget(self.key)
@@ -168,8 +169,8 @@ class Window(PlayerExtras,QMainWindow):
         if rotation!='off':filters.append('transform');options+=['--transform-type='+rotation]
         if filters:options+=['--video-filter='+':'.join(filters)]
         dsp=getattr(self,'audio_dsp','off')
-        if dsp=='normalize':options+=['--audio-filter=normvol','--norm-max-level=2.0']
-        elif dsp=='night':options+=['--audio-filter=compressor','--compressor-threshold=-18','--compressor-ratio=4','--compressor-attack=25','--compressor-release=100','--compressor-makeup-gain=2']
+        from audio_gain import dsp_options
+        panel=getattr(self,'audio_panel',None);options+=dsp_options(dsp,panel.boost.value() if panel else 0,panel.peak_guard.isChecked() if panel else True)
         engine=vlc.Instance(*options)
         if engine is None:raise RuntimeError('VLC tidak dapat memuat plugin codec yang dibundel.')
         return engine
@@ -190,7 +191,7 @@ class Window(PlayerExtras,QMainWindow):
         self.pending_seek=None;self.pending_pause=False
         self.player.stop();self.player.release();self.engine.release()
         self.engine=self.make_engine(index);self.player=self.engine.media_player_new();self.configure_video_output()
-        self.player.audio_set_volume(self.volume.value());self.apply_speed()
+        self.player.audio_set_volume(self.volume.value());self.player.audio_set_mute(self.mute_action.isChecked());self.apply_speed()
         self.audio_panel.reapply();self.apply_video_adjust()
         if self.path:
             self.player.set_media(self.engine.media_new_path(self.path))
@@ -413,6 +414,8 @@ if __name__=='__main__':
                     playback=run_playback_checks(w)
                     from studio_checks import run_studio_checks
                     with tempfile.TemporaryDirectory(prefix='cyber80-studio-test-') as studio_root:playback['video_studio']=run_studio_checks(w,Path(studio_root))
+                    from audio_checks import run_audio_boost_checks
+                    with tempfile.TemporaryDirectory(prefix='cyber80-boost-test-') as boost_root:playback['audio_boost']=run_audio_boost_checks(w,Path(boost_root))
                     from browser_checks import run_browser_checks
                     browser=run_browser_checks(w)
                     output.write_text(json.dumps({'playback':playback,'browser':browser,'credential_manager':'PASS','qt_window':'PASS','vlc_version':vlc.libvlc_get_version().decode(),'ffmpeg':'PASS'}),encoding='utf-8')

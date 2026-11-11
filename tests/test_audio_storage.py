@@ -51,3 +51,14 @@ class AudioUITests(unittest.TestCase):
             w.toggle_pip();w.leave_pip();w.player.play.reset_mock();q.processEvents();self.assertEqual(w.player.play.call_count,1)
             w.toggle_pip();w.stop();w.player.play.reset_mock();q.processEvents();self.assertFalse(w.player.play.called)
         finally:w.close();q.processEvents()
+
+    @patch.object(app.vlc,'Instance',side_effect=fake_engine)
+    @patch('audio_tools.vlc.AudioEqualizer')
+    def test_audio_boost_applies_independently_and_survives_reset(self,constructor,engine):
+        constructor.side_effect=lambda:MagicMock(set_preamp=MagicMock(return_value=0),set_amp_at_index=MagicMock(return_value=0))
+        w=app.Window()
+        try:
+            self.assertEqual(w.volume.maximum(),200);w.audio_panel.boost_preset(20);self.assertEqual(w.volume.value(),200);w.audio_panel.native.set_preamp.assert_called_with(20)
+            w.audio_panel.enabled.setChecked(False);w.audio_panel.apply();w.audio_panel.native.set_preamp.assert_called_with(20);self.assertTrue(w.audio_panel.state()['peak_guard'])
+            w.mute_action.setChecked(True);w.change_renderer(w.renderer.currentIndex());w.player.audio_set_mute.assert_called_with(True);w.audio_panel.boost_preset(0);self.assertEqual(w.volume.value(),100);self.assertEqual(w.audio_panel.state()['boost'],0)
+        finally:w.close();q.processEvents()

@@ -44,3 +44,11 @@ Klik **Layer Green Screen** untuk menambah layer khusus di atas video biasa dan 
 Untuk klip yang sudah ada, pindahkan ke layer Green Screen melalui properti atau drag timeline. Preset diterapkan saat pindah. **Preset Green Screen** mengaktifkan ulang nilai awal pada klip video/gambar yang terpilih. Gunakan **Pilih warna kunci** untuk hijau lain atau blue screen, kemudian sesuaikan **Toleransi warna kunci** dan **Kehalusan tepi**. Klik Terapkan properti klip, perbarui preview atau render proxy, lalu ekspor MP4.
 
 Layer tetap mendukung posisi, ukuran, keyframe, trim dan audio video. Perubahan disimpan dalam proyek dan dapat di-undo. Ini chroma key berdasarkan warna, bukan penghapus background AI; pencahayaan tidak rata, bayangan, rambut dan pantulan hijau dapat memerlukan penyesuaian. Belum ada despill khusus atau color picker dari piksel preview.
+
+## Template kolase, slideshow, opening dan ending
+
+Klik **Template foto / opening**. Pilih kolase 2/4/6/9 foto, slideshow dengan zoom halus, opening, ending, lower third, atau kartu kutipan. Pilih banyak foto dan atur urutan lewat Foto ↑/↓. Isi judul, keterangan, warna latar, durasi, dan logo opsional untuk opening/ending.
+
+Pilih akhir proyek, awal (menggeser seluruh klip yang ada), atau playhead (overlay). Opening menyarankan posisi awal; ending menyarankan akhir. Layer yang terkunci harus dibuka sebelum seluruh timeline digeser. Kolase membuat halaman tambahan bila foto melebihi jumlah kotak; durasi adalah per halaman. Slideshow memakai durasi per foto dan fade ke latar, bukan cross-dissolve berpasangan.
+
+Template menjadi klip/layer biasa yang dapat diubah, disimpan dan di-undo. Foto kolase memakai cover/crop awal; ubah fit menjadi contain bila ingin seluruh foto terlihat. Musik ditambahkan lewat impor audio ke layer Musik. Template tidak mengunduh aset atau musik berlisensi. Batas proyek 32 layer/128 klip tetap berlaku; satu template menambah tiga layer. Tidak ada video stock atau musik bawaan.

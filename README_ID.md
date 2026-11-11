@@ -19,3 +19,5 @@ Dependensi dan lisensi ada pada THIRD_PARTY.md serta berkas lisensi yang dibunde
 ## Editor video multilayer
 
 Buka Cyber80 Hub → Video Studio. Panduan: [VIDEO_STUDIO_ID.md](VIDEO_STUDIO_ID.md). Prompt/spesifikasi pengembangan: [PROMPT_VIDEO_STUDIO_ID.md](PROMPT_VIDEO_STUDIO_ID.md). Lihat batas edisi pertama dan laporan EXE sebelum menganggap setara seluruh fitur Filmora.
+
+Suara terlalu pelan: tombol **BOOST Maks** tersedia pada bar player. Panduan penguatan dan batasannya: [AUDIO_BOOST_ID.md](AUDIO_BOOST_ID.md). Video Studio kini menyediakan layer Green Screen serta template kolase/slideshow/opening/ending yang tetap dapat diedit.

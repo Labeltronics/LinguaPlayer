@@ -2,6 +2,7 @@
 import json,math,os,sys
 from pathlib import Path
 import vlc
+from audio_gain import boost_value,boosted_preamp
 from PySide6.QtCore import Qt,QTimer
 from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QCheckBox,QComboBox,QSlider,
     QPushButton,QDoubleSpinBox,QSpinBox,QInputDialog,QFileDialog,QMessageBox)
@@ -32,7 +33,8 @@ def validate_settings(value):
     bands=value.get('bands',[0.]*10)
     if not isinstance(bands,list) or len(bands)!=10:raise ValueError('Equalizer memerlukan 10 band')
     return {'enabled':bool(value.get('enabled',False)),'preamp':number(value.get('preamp',0)),
-            'bands':[number(x) for x in bands],'headroom':bool(value.get('headroom',True))}
+            'bands':[number(x) for x in bands],'headroom':bool(value.get('headroom',True)),
+            'boost':boost_value(value.get('boost',0)),'peak_guard':bool(value.get('peak_guard',True))}
 
 def effective_preamp(preamp,bands,headroom=True):
     return max(-20.,min(20.,float(preamp)-(max(0.,max(bands)) if headroom else 0.)))
@@ -43,14 +45,14 @@ def write_json_atomic(path,data):
 
 class AudioPanel(QWidget):
     def __init__(self,owner):
-        super().__init__();self.owner=owner;self.native=None;self._loading=True;self.custom={};self.native_presets={}
+        super().__init__();self.owner=owner;self.native=None;self._loading=True;self._limiter_active=False;self.custom={};self.native_presets={}
         self.settings_path=owner.log_path.parent/f'audio-{owner.window_number}.json'
         self.persist='--self-test' not in sys.argv and os.getenv('QT_QPA_PLATFORM')!='offscreen'
         box=QVBoxLayout(self);row=QHBoxLayout();box.addLayout(row)
         self.enabled=QCheckBox('Aktifkan equalizer');row.addWidget(self.enabled)
         self.preset=QComboBox();self.preset.setMinimumWidth(170);row.addWidget(self.preset,1)
         save=QPushButton('Simpan preset');save.clicked.connect(self.save_preset);row.addWidget(save)
-        reset=QPushButton('Normal');reset.clicked.connect(lambda:self.select_preset('Normal / Flat'));row.addWidget(reset)
+        reset=QPushButton('Normal');reset.clicked.connect(lambda:self.boost_preset(0));row.addWidget(reset)
         self.headroom=QCheckBox('Auto-headroom');self.headroom.setChecked(True);self.headroom.setToolTip('Mengurangi preamp sesuai boost terbesar. Ini bukan limiter atau kompresor.');row.addWidget(self.headroom)
         self.sliders=[];self.band_labels=[];bands=QHBoxLayout();box.addLayout(bands)
         frequencies=FREQUENCIES
@@ -67,6 +69,10 @@ class AudioPanel(QWidget):
         row=QHBoxLayout();box.addLayout(row);row.addWidget(QLabel('Preamp'))
         self.preamp=QDoubleSpinBox();self.preamp.setRange(-20,20);self.preamp.setSingleStep(.5);self.preamp.setSuffix(' dB');row.addWidget(self.preamp)
         self.gain_label=QLabel('');row.addWidget(self.gain_label,1)
+        row=QHBoxLayout();box.addLayout(row);row.addWidget(QLabel('Audio Boost'));self.boost=QDoubleSpinBox();self.boost.setRange(0,20);self.boost.setSingleStep(1);self.boost.setSuffix(' dB');row.addWidget(self.boost);self.peak_guard=QCheckBox('Penahan puncak (kompresor)');self.peak_guard.setChecked(True);row.addWidget(self.peak_guard)
+        for label,value in [('+6 dB',6),('+12 dB',12),('Boost Maks',20),('Reset suara',0)]:
+            button=QPushButton(label);button.clicked.connect(lambda checked=False,v=value:self.boost_preset(v));row.addWidget(button)
+        self.boost.valueChanged.connect(self.manual_changed);self.peak_guard.toggled.connect(self.changed)
         row=QHBoxLayout();box.addLayout(row)
         row.addWidget(QLabel('Track audio'));self.track=QComboBox();row.addWidget(self.track,1)
         refresh=QPushButton('Muat track');refresh.clicked.connect(self.refresh_tracks);row.addWidget(refresh)
@@ -74,7 +80,7 @@ class AudioPanel(QWidget):
         for label,value in [('Stereo',1),('Balik stereo',2),('Kiri',3),('Kanan',4)]:self.channel.addItem(label,value)
         self.channel.currentIndexChanged.connect(self.apply_channel);row.addWidget(self.channel)
         row.addWidget(QLabel('Sinkron audio'));self.delay=QSpinBox();self.delay.setRange(-5000,5000);self.delay.setSingleStep(50);self.delay.setSuffix(' ms');self.delay.valueChanged.connect(self.apply_delay);row.addWidget(self.delay)
-        hint=QLabel('Preset Malam adalah pengaturan EQ lembut, bukan penyeragam volume otomatis. Auto-headroom mengurangi risiko clipping; tetap sesuaikan volume. Pilihan track ini untuk pemutaran. Track sumber AI dipilih terpisah di panel Subtitle / AI.');hint.setWordWrap(True);box.addWidget(hint)
+        hint=QLabel('Preset Malam adalah pengaturan EQ lembut, bukan penyeragam volume otomatis. Auto-headroom mengurangi risiko clipping; tetap sesuaikan volume. Boost bekerja juga saat EQ tidak aktif. Kompresor menahan puncak, tetapi bukan jaminan bebas clipping; volume Windows/perangkat tetap berpengaruh. Pilihan track ini untuk pemutaran. Track sumber AI dipilih terpisah di panel Subtitle / AI.');hint.setWordWrap(True);box.addWidget(hint)
         row=QHBoxLayout();box.addLayout(row)
         export=QPushButton('Ekspor profil suara');export.clicked.connect(self.export_profile);row.addWidget(export)
         imp=QPushButton('Impor profil suara');imp.clicked.connect(self.import_profile);row.addWidget(imp)
@@ -83,20 +89,26 @@ class AudioPanel(QWidget):
         self.enabled.toggled.connect(self.changed);self.headroom.toggled.connect(self.changed);self.preamp.valueChanged.connect(self.manual_changed)
         self.track.currentIndexChanged.connect(self.choose_track)
         self.rebuild_presets();self.load();self._loading=False;self.changed()
+    def boost_preset(self,value):
+        self.owner.audio_dsp='off';self._limiter_active=None
+        self.set_state({'enabled':True,'preamp':0,'bands':[0.]*10,'headroom':True,'boost':value,'peak_guard':True})
+        self.preset.blockSignals(True);self.preset.setCurrentText('Normal / Flat' if value==0 else 'Manual');self.preset.blockSignals(False)
+        self.owner.volume.setValue(200 if value>=20 else 100 if value==0 else max(100,self.owner.volume.value()));self.apply()
+        self.owner.status.setText(f'Audio Boost {value:+g} dB • volume {self.owner.volume.value()}%. Bila suara pecah, kurangi boost. Kompresor bukan limiter brick-wall setelah semua gain.')
     def rebuild_presets(self):
         current=self.preset.currentText();self.preset.blockSignals(True);self.preset.clear()
         self.preset.addItems(list(PRESETS));self.preset.addItems(list(self.custom));self.preset.addItem('Manual')
         if self.preset.findText(current)>=0:self.preset.setCurrentText(current)
         self.preset.blockSignals(False)
-    def state(self):return validate_settings({'enabled':self.enabled.isChecked(),'preamp':self.preamp.value(),'bands':[s.value()/10 for s in self.sliders],'headroom':self.headroom.isChecked()})
+    def state(self):return validate_settings({'enabled':self.enabled.isChecked(),'preamp':self.preamp.value(),'bands':[s.value()/10 for s in self.sliders],'headroom':self.headroom.isChecked(),'boost':self.boost.value(),'peak_guard':self.peak_guard.isChecked()})
     def set_state(self,state):
         state=validate_settings(state);self._loading=True
-        self.enabled.setChecked(state['enabled']);self.preamp.setValue(state['preamp']);self.headroom.setChecked(state['headroom'])
+        self.enabled.setChecked(state['enabled']);self.preamp.setValue(state['preamp']);self.headroom.setChecked(state['headroom']);self.boost.setValue(state['boost']);self.peak_guard.setChecked(state['peak_guard'])
         for slider,value in zip(self.sliders,state['bands']):slider.setValue(round(value*10))
         self._loading=False;self.changed()
     def select_preset(self,name):
         if self._loading:return
-        if name in PRESETS:self.set_state({'enabled':True,'preamp':0,'bands':PRESETS[name],'headroom':self.headroom.isChecked()})
+        if name in PRESETS:self.set_state({'enabled':True,'preamp':0,'bands':PRESETS[name],'headroom':self.headroom.isChecked(),'boost':self.boost.value(),'peak_guard':self.peak_guard.isChecked()})
         elif name in self.custom:self.set_state(self.custom[name])
     def manual_changed(self,*args):
         if self._loading:return
@@ -104,18 +116,21 @@ class AudioPanel(QWidget):
     def changed(self,*args):
         if self._loading:return
         for s,label in zip(self.sliders,self.band_labels):label.setText(f'{s.value()/10:+.1f} dB')
-        state=self.state();gain=effective_preamp(state['preamp'],state['bands'],state['headroom'])
-        self.gain_label.setText(f'Preamp diterapkan: {gain:+.1f} dB' if state['enabled'] else 'Bypass — suara asli')
+        state=self.state();gain=boosted_preamp(state['preamp'] if state['enabled'] else 0,state['bands'] if state['enabled'] else [0]*10,state['headroom'] if state['enabled'] else False,state['boost'])
+        self.gain_label.setText(f'Gain diterapkan: {gain:+.1f} dB • Boost {state["boost"]:+.1f} dB' if state['enabled'] or state['boost'] else 'Bypass — suara asli')
         self.timer.start(80)
     def apply(self):
         if self._loading or self.owner.closing:return
-        state=self.state();player=self.owner.player;new=None
+        state=self.state();guard=state['boost']>0 and state['peak_guard']
+        if guard!=self._limiter_active:
+            self._limiter_active=guard;self.owner.change_renderer(self.owner.renderer.currentIndex());return
+        player=self.owner.player;new=None
         try:
-            if state['enabled']:
+            if state['enabled'] or state['boost']:
                 new=vlc.AudioEqualizer()
                 if new is None:raise RuntimeError('Equalizer VLC tidak tersedia.')
-                if new.set_preamp(effective_preamp(state['preamp'],state['bands'],state['headroom']))==-1:raise RuntimeError('Preamp tidak didukung.')
-                for i,gain in enumerate(state['bands']):
+                if new.set_preamp(boosted_preamp(state['preamp'] if state['enabled'] else 0,state['bands'] if state['enabled'] else [0]*10,state['headroom'] if state['enabled'] else False,state['boost']))==-1:raise RuntimeError('Preamp tidak didukung.')
+                for i,gain in enumerate(state['bands'] if state['enabled'] else [0]*10):
                     if new.set_amp_at_index(gain,i)==-1:raise RuntimeError('Band equalizer tidak didukung.')
             if player.set_equalizer(new)==-1:raise RuntimeError('VLC menolak equalizer.')
             old=self.native;self.native=new

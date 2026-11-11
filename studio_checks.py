@@ -41,6 +41,10 @@ def run_studio_checks(owner,root):
         if not (bg[2]>170 and bg[1]<80 and fg[0]>170 and fg[1]<80):raise RuntimeError('Green screen background/foreground composition incorrect')
         report['green_screen_layer_and_transparency']='PASS'
         report['multilayer_mp4_titles_subtitles_audio_mix_ducking']='PASS';report['source_preservation']='PASS';studio.play_result();wait_for(lambda:studio.proxy_player.player.has_vout()>0,timeout=20);report['actual_vlc_composition_playback']='PASS'
+        from video_templates import apply_template
+        apply_template(studio.project,'collage2',photos=[str(image),str(image)],duration=.5,placement='append');apply_template(studio.project,'opening',title='Pembukaan Cyber80',duration=.5,placement='prepend');apply_template(studio.project,'ending',title='Terima kasih',duration=.5,placement='append');studio.commit();studio.debounce.stop();template_target=root/'studio-templates.mp4';assert studio.start_render(str(template_target),'export');studio.job.failure.connect(failures.append);wait_for(lambda:studio.job is None,timeout=60)
+        if failures or not template_target.is_file():raise RuntimeError('Template export failed: '+str(failures))
+        report['collage_opening_ending_templates_export']='PASS'
     finally:
         studio.debounce.stop()
         if studio.import_job:studio.import_job.requestInterruption();studio.import_job.wait(30000);QApplication.processEvents()

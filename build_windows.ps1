@@ -33,6 +33,7 @@ Copy-Item AUDIT_CYBER80_PLAYERS_ID.md dist\Cyber80Players\
 Copy-Item PEMBARUAN_CYBER80_ID.md dist\Cyber80Players\
 Copy-Item CYBER80_BROWSER_3D_ID.md dist\Cyber80Players\
 Copy-Item VIDEO_STUDIO_ID.md dist\Cyber80Players\
+Copy-Item AUDIO_BOOST_ID.md dist\Cyber80Players\
 Copy-Item PROMPT_VIDEO_STUDIO_ID.md dist\Cyber80Players\
 Copy-Item GEMINI_LIVE_TEST_REPORT.json dist\Cyber80Players\
 Copy-Item examples dist\Cyber80Players\ -Recurse

@@ -93,7 +93,7 @@ class VideoStudio(QDialog):
         super().__init__(owner,Qt.Window);self.owner=owner;self.project=vp.new_project();self.history=vp.History(self.project);self.project_path=None;self.selected='';self.selected_track=self.project['tracks'][1]['id'];self.playhead=0.;self.dirty=False;self.released=False;self.job=None;self.import_job=None;self.job_kind='';self.last_output='';self.proxy_player=None;self.assets=[];self.fields={};self.revision=0;self.pending_still=False;self.job_revision=0;self.cache=tempfile.TemporaryDirectory(prefix='cyber80-studio-');self.autosave_path=owner.log_path.parent/f'video-studio-autosave-{owner.window_number}.cyber80.json'
         self.setWindowTitle('Cyber80 Video Studio • Multilayer Editor');self.resize(1400,900);self.setAcceptDrops(True)
         box=QVBoxLayout(self)
-        for buttons in [[('Proyek baru',self.new),('Buka proyek',self.open),('Simpan',self.save),('Simpan sebagai',lambda:self.save(True)),('Pulihkan autosave',self.recover),('Undo',lambda:self.undo(-1)),('Redo',lambda:self.undo(1)),('Pengaturan proyek',self.settings_dialog)], [('Impor media',self.import_dialog),('Tambah layer',self.add_track),('Layer Green Screen',self.add_green_screen),('Warna / latar',self.add_color),('Teks / judul',self.add_text),('Impor SRT',self.import_srt),('Subtitle AI film aktif',self.copy_ai),('Split di playhead',self.split),('Duplikat',self.duplicate),('Hapus klip',self.delete)], [('Perbarui preview frame',self.preview_frame),('Render & putar proxy',lambda:self.export(True)),('Ekspor MP4',lambda:self.export(False)),('Batalkan render',self.cancel),('Putar hasil',self.play_result),('Relink sumber',self.relink),('Buka sumber di player / AI',self.open_source)]]:
+        for buttons in [[('Proyek baru',self.new),('Buka proyek',self.open),('Simpan',self.save),('Simpan sebagai',lambda:self.save(True)),('Pulihkan autosave',self.recover),('Undo',lambda:self.undo(-1)),('Redo',lambda:self.undo(1)),('Pengaturan proyek',self.settings_dialog)], [('Impor media',self.import_dialog),('Tambah layer',self.add_track),('Layer Green Screen',self.add_green_screen),('Template foto / opening',self.add_template),('Warna / latar',self.add_color),('Teks / judul',self.add_text),('Impor SRT',self.import_srt),('Subtitle AI film aktif',self.copy_ai),('Split di playhead',self.split),('Duplikat',self.duplicate),('Hapus klip',self.delete)], [('Perbarui preview frame',self.preview_frame),('Render & putar proxy',lambda:self.export(True)),('Ekspor MP4',lambda:self.export(False)),('Batalkan render',self.cancel),('Putar hasil',self.play_result),('Relink sumber',self.relink),('Buka sumber di player / AI',self.open_source)]]:
             row=QHBoxLayout();box.addLayout(row)
             for title,fn in buttons:b=QPushButton(title);b.clicked.connect(fn);row.addWidget(b)
         upper=QSplitter(Qt.Horizontal);self.bin=QListWidget();self.bin.setMinimumWidth(150);self.bin.setMaximumWidth(230);self.bin.itemDoubleClicked.connect(self.add_asset);upper.addWidget(self.bin)
@@ -220,6 +220,16 @@ class VideoStudio(QDialog):
         asset=item.data(Qt.UserRole);target=self.target_track(asset['kind']);c=vp.new_clip(target,asset['kind'],asset['path'],max(1/vp.fps(self.project),vp.snap(self.project,asset['duration'])),has_audio=asset['has_audio'],source_has_audio=asset['has_audio'],source_duration=asset['duration'],name=asset['name'])
         if target and vp.track(self.project,target).get('preset')=='greenscreen' and asset['kind'] in ('video','image'):vp.green_screen_defaults(c)
         self.insert(c,at)
+    def add_template(self):
+        if self.import_job:self.message('Tunggu impor selesai sebelum menambah template.');return
+        from template_dialog import TemplateDialog
+        dialog=TemplateDialog(self)
+        if dialog.exec()==QDialog.Accepted:self.apply_template(dialog.values())
+    def apply_template(self,values):
+        from video_templates import apply_template
+        result=[]
+        if self.mutate(lambda:result.append(apply_template(self.project,playhead=self.playhead,**values))):
+            self.selected='';self.select_track(result[0]['track']);self.seek(result[0]['start']);self.message('Template dibuat sebagai layer/klip yang dapat diedit. Atur foto, teks, durasi dan musik; render proxy untuk preview bergerak.')
     def add_green_screen(self):
         created=[]
         if self.mutate(lambda:created.append(vp.add_green_screen_track(self.project))):

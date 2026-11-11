@@ -33,3 +33,11 @@ class StudioUITests(unittest.TestCase):
                 editor.add_asset(item);clip=editor.current();self.assertEqual(clip['track'],target);self.assertTrue(clip['chroma']);self.assertEqual(editor.chroma_color.text(),'#00ff00')
                 editor.chroma_color.setText('#0000ff');editor.fields['chroma_similarity'].setValue(.2);editor.apply_properties();self.assertEqual(editor.current()['chroma_color'],'#0000ff');editor.green_screen_preset();self.assertEqual(editor.current()['chroma_color'],'#00ff00')
             finally:editor.debounce.stop();editor.dirty=False;editor.close();owner.close();q.processEvents()
+
+    def test_editable_opening_and_ending_templates(self):
+        with tempfile.TemporaryDirectory() as d:
+            owner=QWidget();owner.log_path=Path(d)/'log';owner.window_number=99;owner.storage_enabled=False;owner.private_session=False;owner.cues=[];editor=VideoStudio(owner);editor.debounce.timeout.disconnect()
+            try:
+                editor.apply_template({'preset':'opening','title':'Pembukaan','duration':1,'placement':'prepend'});editor.apply_template({'preset':'ending','title':'Penutup','duration':1,'placement':'append'})
+                self.assertEqual(v.duration(editor.project),2);self.assertTrue(any(c['text']=='Pembukaan' for c in editor.project['clips']));editor.undo(-1);self.assertEqual(v.duration(editor.project),1)
+            finally:editor.debounce.stop();editor.dirty=False;editor.close();owner.close();q.processEvents()
