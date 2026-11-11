@@ -13,25 +13,28 @@ import vlc, imageio_ffmpeg
 from PySide6.QtCore import Qt, QThread, Signal, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,
-    QFileDialog,QLabel,QLineEdit,QComboBox,QSlider,QTableWidget,QTableWidgetItem,QMessageBox,QSpinBox,QFrame,QDialog)
+    QFileDialog,QLabel,QLineEdit,QComboBox,QSlider,QTableWidget,QTableWidgetItem,QMessageBox,QSpinBox,QFrame,QDialog,QDockWidget)
 from core import Cue, transcribe, srt
 from credentials import save_key, load_key, delete_key
+from stereo import VideoSurface
+from player_extras import PlayerExtras
 
 class Job(QThread):
     progress=Signal(str)
     result=Signal(object)
     chunk_ready=Signal(object,float)
     failed=Signal(str)
-    def __init__(self, path, key, model, language, google, glossary):
+    def __init__(self, path, key, model, language, google, glossary, resume_from=0, initial_cues=None):
         super().__init__(); self.args=(path,key,model,language,google,glossary)
+        self.resume_from=resume_from;self.start_offset=resume_from;self.initial_cues=list(initial_cues or [])
     def run(self):
         path,key,model,lang,google,glossary=self.args
-        cues=[]
+        cues=list(self.initial_cues)
         try:
             ff=imageio_ffmpeg.get_ffmpeg_exe()
             flags={'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}
             with tempfile.TemporaryDirectory(prefix='linguaplayer-') as tmp:
-                offset=0
+                offset=self.start_offset
                 while not self.isInterruptionRequested():
                     self.progress.emit(f'Mengekstrak audio {offset//60:02}:{offset%60:02} …')
                     out=str(Path(tmp)/'chunk.wav')
@@ -45,8 +48,8 @@ class Job(QThread):
                     with wave.open(out,'rb') as w: duration=w.getnframes()/w.getframerate()
                     if duration < .1: break
                     self.progress.emit(f'Mentranskrip / menerjemahkan {offset//60:02}:{offset%60:02} …')
-                    chunk=transcribe(Path(out).read_bytes(),key,model,lang,duration,offset,google,self.isInterruptionRequested,glossary)
-                    cues.extend(chunk);self.chunk_ready.emit(chunk,offset+duration)
+                    chunk=transcribe(Path(out).read_bytes(),key,model,lang,duration,offset,google,self.isInterruptionRequested,glossary,progress=self.progress.emit,timeout=180)
+                    cues.extend(chunk);self.resume_from=offset+10;self.chunk_ready.emit(chunk,offset+duration)
                     if duration < 9.95: break
                     offset+=10
             if self.isInterruptionRequested(): raise InterruptedError('Dibatalkan')
@@ -69,18 +72,19 @@ class PictureWindow(QDialog):
     def closeEvent(self,event):
         event.ignore();self.returning.emit()
 
-class Window(QMainWindow):
+class Window(PlayerExtras,QMainWindow):
     def __init__(self):
         super().__init__(); self.setWindowTitle('LinguaPlayer • Video & AI Subtitle'); self.resize(1200,850)
+        self.retry_context=None;self.resume_offset=0
         self.path=''; self.job=None; self.cues=[];self.coverage=0.;self.processing=False;self.buffering=False;self.want_play=False
         self.pip=None;self.pending_seek=None;self.pending_pause=False;self.closing=False;self.playback_error_reported=False
         self.log_path=Path(os.getenv('LOCALAPPDATA',tempfile.gettempdir()))/'LinguaPlayer'/'playback.log'
         self.log_path.parent.mkdir(parents=True,exist_ok=True)
         self.engine=self.make_engine(0);self.player=self.engine.media_player_new()
         root=QWidget(); self.setCentralWidget(root); layout=QVBoxLayout(root)
-        title=QLabel('LinguaPlayer  |  Video • Speech to Text • Terjemahan'); title.setStyleSheet('font-size:22px;font-weight:bold'); layout.addWidget(title)
+        title=QLabel('LinguaPlayer  |  Video • Speech to Text • Terjemahan'); title.setWordWrap(True);title.setStyleSheet('font-size:18px;font-weight:bold'); layout.addWidget(title)
         self.video_host=QWidget();self.host_layout=QVBoxLayout(self.video_host);self.host_layout.setContentsMargins(0,0,0,0)
-        self.video=QFrame();self.video.setMinimumSize(160,160)
+        self.video=VideoSurface();self.video.setMinimumSize(160,160)
         self.video.setAttribute(Qt.WA_NativeWindow,True)
         self.video.setAttribute(Qt.WA_DontCreateNativeAncestors,True)
         self.video.setAttribute(Qt.WA_NoSystemBackground,True)
@@ -94,50 +98,61 @@ class Window(QMainWindow):
         self.button(row,'Stop',self.stop);self.pip_button=self.button(row,'PiP',self.toggle_pip)
         self.renderer=QComboBox();self.renderer.addItems(['Kompatibel (CPU / GDI)','Otomatis (GPU)','Direct3D11'])
         if sys.platform!='win32':self.renderer.setCurrentIndex(1)
-        self.renderer.currentIndexChanged.connect(self.change_renderer);row.addWidget(self.renderer)
-        self.button(row,'Log video',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.log_path))))
+        self.renderer.currentIndexChanged.connect(self.change_renderer)
+        render_row=QHBoxLayout();layout.addLayout(render_row);render_row.addWidget(self.renderer);render_row.addStretch()
+        self.button(render_row,'Log video',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.log_path))))
         self.seek=QSlider(Qt.Horizontal); self.seek.setRange(0,1000); self.seek.sliderReleased.connect(lambda:self.player.set_position(self.seek.value()/1000)); row.addWidget(self.seek,1)
         volume=QSlider(Qt.Horizontal); volume.setRange(0,100); volume.setValue(80); volume.setMaximumWidth(100); volume.valueChanged.connect(lambda value:self.player.audio_set_volume(value)); row.addWidget(QLabel('Volume'));row.addWidget(volume);self.player.audio_set_volume(80);self.volume=volume
-        row=QHBoxLayout();layout.addLayout(row)
+        self.ai_panel=QWidget();ai_layout=QVBoxLayout(self.ai_panel)
+        row=QHBoxLayout();ai_layout.addLayout(row)
         self.key=QLineEdit(os.getenv('GEMINI_API_KEY',''));self.key.setEchoMode(QLineEdit.Password);self.key.setPlaceholderText('Gemini API key');row.addWidget(self.key)
-        self.model=QLineEdit('gemini-3.8-flash');self.model.setMaximumWidth(170);row.addWidget(self.model)
+        self.model=QLineEdit('gemini-3.5-flash-lite');self.model.setMaximumWidth(170);row.addWidget(self.model)
         self.lang=QComboBox();self.lang.setEditable(True);self.lang.setToolTip('Pilih bahasa atau ketik bahasa/kode lain. Untuk Google Translate gunakan kode bahasa yang didukung API.')
         for name,code in [('Indonesia','id'),('English','en'),('Mandarin','zh-CN'),('Jepang','ja'),('Korea','ko'),('Arab','ar'),('Spanyol','es'),('Prancis','fr'),('Jerman','de'),('Hindi','hi'),('Portugis','pt'),('Rusia','ru'),('Melayu','ms'),('Italia','it'),('Belanda','nl'),('Turki','tr'),('Thai','th'),('Vietnam','vi')]: self.lang.addItem(name,code)
         self.lang.setCurrentIndex(self.lang.findData('id'))
         row.addWidget(self.lang)
-        self.google=QLineEdit(os.getenv('GOOGLE_TRANSLATE_API_KEY',''));self.google.setEchoMode(QLineEdit.Password);self.google.setPlaceholderText('Google Translate key (opsional)');row.addWidget(self.google)
-        row=QHBoxLayout();layout.addLayout(row)
+        self.google=QLineEdit(os.getenv('GOOGLE_TRANSLATE_API_KEY',''));self.google.setEchoMode(QLineEdit.Password);self.google.setPlaceholderText('Google Translate nonaktif (Gemini Free Tier)');self.google.setEnabled(False);self.google.hide()
+        row=QHBoxLayout();ai_layout.addLayout(row)
         self.button(row,'Simpan API key di Windows',self.save_keys);self.button(row,'Hapus key tersimpan',self.delete_keys)
-        self.glossary=QLineEdit();self.glossary.setPlaceholderText('Kamus ejaan: nama orang, merek, istilah khusus (untuk transkripsi/Gemini)');layout.addWidget(self.glossary)
-        self.generate=self.button(row,'Buat subtitle online',self.process);self.cancel=self.button(row,'Batalkan',self.cancel_job);self.cancel.setEnabled(False)
+        row=QHBoxLayout();ai_layout.addLayout(row)
+        self.glossary=QLineEdit();self.glossary.setPlaceholderText('Kamus ejaan: nama orang, merek, istilah khusus (untuk transkripsi/Gemini)');ai_layout.addWidget(self.glossary)
+        self.generate=self.button(row,'Buat / Lanjutkan subtitle',self.process);self.cancel=self.button(row,'Batalkan',self.cancel_job);self.cancel.setEnabled(False)
+        row=QHBoxLayout();ai_layout.addLayout(row)
         self.import_button=self.button(row,'Buka SRT offline',self.import_srt);self.button(row,'Ekspor SRT',self.export);self.button(row,'Simpan proyek',self.save);self.load=self.button(row,'Buka proyek',self.load_project)
+        row=QHBoxLayout();ai_layout.addLayout(row)
         row.addWidget(QLabel('Offset subtitle (ms)'));self.offset=QSpinBox();self.offset.setRange(-600000,600000);self.offset.setSingleStep(100);row.addWidget(self.offset)
         self.mode=QComboBox();self.mode.addItems(['Bilingual','Terjemahan','Asli']);self.mode.setCurrentIndex(1);row.addWidget(self.mode)
-        self.table=QTableWidget(0,4);self.table.setHorizontalHeaderLabels(['Mulai (detik)','Akhir (detik)','Ucapan asli','Terjemahan']);self.table.horizontalHeader().setStretchLastSection(True);self.table.setColumnWidth(2,360);self.table.setColumnWidth(3,360);layout.addWidget(self.table)
+        self.table=QTableWidget(0,4);self.table.setMinimumHeight(100);self.table.setHorizontalHeaderLabels(['Mulai (detik)','Akhir (detik)','Ucapan asli','Terjemahan']);self.table.horizontalHeader().setStretchLastSection(True);self.table.setColumnWidth(2,360);self.table.setColumnWidth(3,360);ai_layout.addWidget(self.table)
         self.table.itemChanged.connect(self.edited);self.table.cellDoubleClicked.connect(self.jump)
-        self.detected=QLabel('Bahasa sumber: deteksi otomatis dari suara → Indonesia (default)');layout.addWidget(self.detected)
+        self.detected=QLabel('Bahasa sumber: deteksi otomatis dari suara → Indonesia (default)');ai_layout.addWidget(self.detected)
+        self.api_status=QLabel('AI: siap. Gunakan proyek Free Tier tanpa billing.');self.api_status.setWordWrap(True);ai_layout.addWidget(self.api_status)
         self.status=QLabel('Audio dikirim ke Google saat Anda menekan Buat subtitle online. Akurasi perlu ditinjau.');self.status.setWordWrap(True);layout.addWidget(self.status)
+        self.subtitle_dock=QDockWidget('Subtitle & Gemini',self);self.subtitle_dock.setObjectName('subtitle');self.subtitle_dock.setWidget(self.ai_panel);self.addDockWidget(Qt.BottomDockWidgetArea,self.subtitle_dock);self.subtitle_dock.hide()
         try:
-            self.key.setText(load_key('Gemini') or self.key.text());self.google.setText(load_key('GoogleTranslate') or self.google.text())
+            self.key.setText(load_key('Gemini') or self.key.text());self.google.clear()
         except Exception:pass
+        self.google.clear()
+        self.setup_extras()
         self.timer=QTimer(self);self.timer.timeout.connect(self.tick);self.timer.start(100)
         QTimer.singleShot(0,self.bind_video)
         self.setStyleSheet('QMainWindow,QWidget{background:#111827;color:#e5e7eb} QPushButton,QLineEdit,QComboBox,QSpinBox{padding:7px;background:#25334b;border:1px solid #41516c;border-radius:5px} QTableWidget{background:#172237} QPushButton:disabled{color:#6b7280}')
     def make_engine(self,mode):
         options=['--ignore-config','--no-video-title-show','--no-osd','--video','--audio',
-                 '--no-plugins-cache','--file-logging','--logfile='+str(self.log_path),'--verbose=2']
+                 '--audio-time-stretch','--no-plugins-cache','--file-logging','--logfile='+str(self.log_path),'--verbose=2']
         if '--self-test' in sys.argv:options+=['--aout=dummy']
         if sys.platform=='win32':
             if vlcdir.is_dir():
                 import ctypes
                 # Keep VLC decoder dependencies ahead of unrelated Qt/PyInstaller DLLs.
                 ctypes.windll.kernel32.SetDllDirectoryW(str(vlcdir))
-            if mode==0:options+=['--avcodec-hw=none','--vout=wingdi']
+            if getattr(self,'stereo_on',False):options+=['--avcodec-hw=none','--vout=vmem']
+            elif mode==0:options+=['--avcodec-hw=none','--vout=wingdi']
             elif mode==2:options+=['--avcodec-hw=none','--vout=direct3d11']
         engine=vlc.Instance(*options)
         if engine is None:raise RuntimeError('VLC tidak dapat memuat plugin codec yang dibundel.')
         return engine
     def bind_video(self):
+        if getattr(self,'stereo_on',False):return
         handle=int(self.video.winId())
         if sys.platform=='win32':self.player.set_hwnd(handle)
         elif sys.platform=='darwin':self.player.set_nsobject(handle)
@@ -147,17 +162,17 @@ class Window(QMainWindow):
         active=state in (vlc.State.Playing,vlc.State.Paused,vlc.State.Buffering)
         paused=state==vlc.State.Paused
         self.player.stop();self.player.release();self.engine.release()
-        self.engine=self.make_engine(index);self.player=self.engine.media_player_new();self.bind_video()
-        self.player.audio_set_volume(self.volume.value())
+        self.engine=self.make_engine(index);self.player=self.engine.media_player_new();self.configure_video_output()
+        self.player.audio_set_volume(self.volume.value());self.apply_speed()
         if self.path:
             self.player.set_media(self.engine.media_new_path(self.path))
-            if active:self.pending_seek=position;self.pending_pause=paused;self.player.play()
+            if active:self.pending_seek=position;self.pending_pause=paused;self.player.play();self.apply_speed()
         self.status.setText('Mode tampilan: '+self.renderer.currentText())
     def restart_surface(self,position,active,paused):
         if self.closing:return
         self.bind_video()
         if active:
-            self.pending_seek=position;self.pending_pause=paused;self.player.play()
+            self.pending_seek=position;self.pending_pause=paused;self.player.play();self.apply_speed()
     def toggle_pip(self):
         if self.pip:return self.leave_pip()
         position=max(0,self.player.get_time());state=self.player.get_state()
@@ -185,6 +200,8 @@ class Window(QMainWindow):
         self.bind_video();self.player.set_media(self.engine.media_new_path(self.path))
         if self.player.play()==-1:raise RuntimeError('VLC gagal memulai video. Coba mode Kompatibel (CPU / GDI).')
         self.fill([]);self.status.setText(path.name)
+        self.retry_context=None;self.resume_offset=0
+        self.playlist_opened(self.path)
     def button(self,row,label,fn):
         b=QPushButton(label);b.clicked.connect(fn);row.addWidget(b);return b
     def save_keys(self):
@@ -215,17 +232,29 @@ class Window(QMainWindow):
             elif not self.buffering:self.player.play()
         elif self.path:self.player.pause() if self.player.is_playing() else self.player.play()
     def process(self):
-        if not self.path or not self.key.text().strip(): return self.error('Buka video dan isi Gemini API key.')
+        if self.job is not None and self.job.isRunning():return
+        if not self.path:return self.error('Buka video terlebih dahulu.')
+        if not self.key.text().strip():
+            self.subtitle_dock.show();self.subtitle_dock.raise_();self.key.setFocus();self.status.setText('Isi Gemini API key, lalu simpan di Windows.');return
         if QMessageBox.question(self,'Proses online','Audio video akan dikirim ke Google. Pemakaian API dapat dikenakan biaya. Lanjutkan?')!=QMessageBox.Yes: return
         lang=self.lang.currentData() if self.lang.currentText()==self.lang.itemText(self.lang.currentIndex()) else self.lang.currentText().strip()
-        self.player.set_pause(1);self.player.set_time(0);self.fill([])
-        self.coverage=0.;self.processing=True;self.buffering=True;self.want_play=True
+        context=(self.path,self.model.text().strip(),lang,self.glossary.text().strip())
+        resume=self.retry_context==context and self.resume_offset>0 and bool(self.cues)
+        position=self.resume_offset if resume else 0
+        if not resume:self.fill([]);self.coverage=0.
+        self.retry_context=context
+        self.player.set_pause(1);self.player.set_time(position*1000)
+        self.processing=True;self.buffering=True;self.want_play=True
         self.offset.setValue(0);self.lang.setEnabled(False);self.seek.setEnabled(False);self.table.setEnabled(False);self.import_button.setEnabled(False)
-        self.job=Job(self.path,self.key.text().strip(),self.model.text().strip(),lang,self.google.text().strip(),self.glossary.text().strip())
-        self.job.chunk_ready.connect(self.receive_chunk);self.job.progress.connect(self.status.setText);self.job.result.connect(self.done);self.job.failed.connect(self.error);self.job.finished.connect(self.finished)
+        self.job=Job(self.path,self.key.text().strip(),self.model.text().strip(),lang,'',self.glossary.text().strip(),resume_from=position,initial_cues=self.cues)
+        self.job.chunk_ready.connect(self.receive_chunk);self.job.progress.connect(self.api_status.setText);self.job.result.connect(self.done);self.job.failed.connect(self.job_error);self.job.finished.connect(self.finished)
         self.open.setEnabled(False);self.load.setEnabled(False);self.generate.setEnabled(False);self.cancel.setEnabled(True);self.job.start()
+    def job_error(self,message):
+        if self.job is not None:self.resume_offset=self.job.resume_from
+        self.want_play=False;self.player.set_pause(1);self.api_status.setText(message)
+        if message!='Dibatalkan':self.error(message+'\nHasil parsial dipertahankan. Anda dapat menyimpan SRT atau melanjutkan bagian yang gagal.')
     def cancel_job(self):
-        if self.job: self.job.requestInterruption();self.status.setText('Membatalkan; menunggu permintaan API aktif selesai (maks. 120 detik).')
+        if self.job: self.job.requestInterruption();self.status.setText('Membatalkan; menunggu permintaan API aktif selesai (maks. 180 detik).')
     def receive_chunk(self,cues,coverage):
         self.coverage=coverage;self.fill(self.cues+list(cues))
         langs=sorted({c.language for c in self.cues if c.language})
@@ -237,7 +266,8 @@ class Window(QMainWindow):
         self.processing=False;self.buffering=False;self.lang.setEnabled(True);self.seek.setEnabled(True);self.table.setEnabled(True);self.import_button.setEnabled(True)
         self.open.setEnabled(True);self.load.setEnabled(True);self.generate.setEnabled(True);self.cancel.setEnabled(False);self.job.deleteLater();self.job=None
     def done(self,cues):
-        self.processing=False;self.buffering=False
+        self.processing=False;self.buffering=False;self.retry_context=None;self.resume_offset=0
+        self.api_status.setText('AI: proses selesai.')
         if self.want_play:self.player.play()
         self.fill(cues);self.status.setText(f'{len(cues)} subtitle selesai. Koreksi teks/timing pada tabel; klik dua kali untuk menuju adegan.')
     def fill(self,cues):
@@ -256,8 +286,9 @@ class Window(QMainWindow):
             self.error('Waktu harus angka positif dan akhir lebih besar dari mulai.');self.fill(self.cues)
     def jump(self,row,col): self.player.set_time(int(self.cues[row].start*1000))
     def tick(self):
+        self.extra_tick()
         if self.pending_seek is not None and self.player.get_state()==vlc.State.Playing:
-            self.player.set_time(self.pending_seek);self.pending_seek=None
+            self.player.set_time(self.pending_seek);self.pending_seek=None;self.apply_speed()
             if self.pending_pause:self.player.set_pause(1)
             self.pending_pause=False
         if not self.seek.isSliderDown():self.seek.setValue(max(0,int(self.player.get_position()*1000)))
@@ -304,7 +335,7 @@ class Window(QMainWindow):
             except Exception as e:self.error(str(e))
     def closeEvent(self,event):
         if self.job and self.job.isRunning():self.cancel_job();self.error('Tunggu pembatalan selesai sebelum menutup aplikasi.');event.ignore();return
-        self.closing=True;self.leave_pip();self.timer.stop()
+        self.closing=True;self.leave_pip();self.timer.stop();self.extras_cleanup()
         self.player.stop();self.player.release();self.engine.release();event.accept()
 
 if __name__=='__main__':

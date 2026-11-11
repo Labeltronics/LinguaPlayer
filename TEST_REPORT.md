@@ -19,3 +19,9 @@ Belum diverifikasi: build EXE Windows, playback VLC riil, codec/video nyata lint
 
 - 11 tes otomatis (9 core + 2 player) lulus pada Linux, termasuk worker FFmpeg 12 detik dengan dua chunk (API mock).
 - Prompt terjemahan diatur untuk bahasa alami sesuai konteks; target id meminta ejaan Indonesia baku. Ini petunjuk model, bukan jaminan mutu profesional.
+
+## Pembaruan playlist, pemutar ganda, 3D dan timeout
+
+32 tes otomatis lulus di Linux: termasuk timeout socket, Retry-After, penolakan akses tanpa retry, penghentian kuota harian, penyamaran key, resume setelah chunk gagal, dua controller independen, shortcut seek, speed, playlist Unicode/relative paths, komposisi anaglyph, pertukaran mata, clipping pergeseran dan buffer RV32 sejajar 32 byte. Tampilan diperiksa pada lebar 960 piksel agar dua jendela dapat berdampingan.
+
+Tes EXE Windows diperluas untuk memutar delapan format nyata dengan VLC sistem dinonaktifkan, seek 60 detik, speed 1.5×, dua video bersamaan, frame anaglyph melalui callback VLC, PiP saat 3D, kembali ke output native, fullscreen, dan auto-next playlist. Hasil akhir tersedia pada log GitHub Actions build pembaruan ini. Tes ini tidak memanggil Gemini langsung; masalah timeout pada jaringan pengguna atau penolakan proyek masih perlu diverifikasi setelah pengguna menjalankan versi baru.

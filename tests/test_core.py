@@ -1,6 +1,6 @@
 import unittest, json
 from unittest.mock import patch
-from core import Cue,validate,srt,transcribe,request_json,parse_srt
+from core import Cue,validate,srt,transcribe,request_json,parse_srt,APIError
 
 class CoreTests(unittest.TestCase):
     def test_timestamp_and_unicode(self):
@@ -22,7 +22,7 @@ class CoreTests(unittest.TestCase):
     @patch('core.request_json')
     def test_incomplete_response(self,api):
         api.return_value={'candidates':[{'finishReason':'MAX_TOKENS'}]}
-        with self.assertRaises(ValueError):transcribe(b'a','key','model','en',10,0)
+        with self.assertRaises(APIError):transcribe(b'a','key','model','en',10,0)
     def test_cancel_before_network(self):
         with self.assertRaises(InterruptedError):request_json('https://example.com','key',{},lambda:True)
     def test_silence(self):self.assertEqual(validate([],45),[])

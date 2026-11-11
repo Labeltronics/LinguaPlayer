@@ -34,7 +34,7 @@ class PlayerTests(unittest.TestCase):
             chunks=[];results=[];errors=[]
             job.chunk_ready.connect(lambda cues,coverage:chunks.append(coverage))
             job.result.connect(results.append);job.failed.connect(errors.append)
-            with patch.object(app,'transcribe',side_effect=lambda audio,key,model,lang,duration,offset,*args:[Cue(offset,offset+min(duration,1),'Hello','Halo','en')]) as api:
+            with patch.object(app,'transcribe',side_effect=lambda audio,key,model,lang,duration,offset,*args,**kwargs:[Cue(offset,offset+min(duration,1),'Hello','Halo','en')]) as api:
                 job.run()
                 self.assertEqual(api.call_count,2)
             self.assertFalse(errors);self.assertEqual(len(results),1)
@@ -52,3 +52,19 @@ class PlayerTests(unittest.TestCase):
                 w.leave_pip();q.processEvents()
                 self.assertIsNone(w.pip);self.assertEqual(w.video.parentWidget(),w.video_host)
             finally:w.close();q.processEvents()
+
+    def test_resume_after_failed_chunk_preserves_completed_cues(self):
+        ff=app.imageio_ffmpeg.get_ffmpeg_exe()
+        flags={'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}
+        with tempfile.TemporaryDirectory() as d:
+            video=str(Path(d)/'sample.mp4')
+            subprocess.run([ff,'-v','error','-f','lavfi','-i','color=black:s=160x120:d=12','-f','lavfi','-i','sine=frequency=440:duration=12','-c:v','mpeg4','-c:a','aac','-shortest',video],check=True,**flags)
+            job=app.Job(video,'dummy','model','id','','');received=[];errors=[]
+            job.chunk_ready.connect(lambda cues,coverage:received.extend(cues));job.failed.connect(errors.append)
+            with patch.object(app,'transcribe',side_effect=[[Cue(0,1,'Hello','Halo','en')],TimeoutError('timed out')]):job.run()
+            self.assertEqual(job.resume_from,10);self.assertEqual(len(received),1);self.assertTrue(errors)
+            resumed=app.Job(video,'dummy','model','id','','',resume_from=job.resume_from,initial_cues=received);results=[]
+            resumed.result.connect(results.append)
+            with patch.object(app,'transcribe',return_value=[Cue(10,11,'World','Dunia','en')]) as api:
+                resumed.run();self.assertEqual(api.call_count,1);self.assertEqual(api.call_args.args[5],10)
+            self.assertEqual([c.start for c in results[0]],[0,10])

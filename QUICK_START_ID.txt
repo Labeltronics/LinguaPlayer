@@ -1,31 +1,66 @@
 LINGUAPLAYER — WINDOWS SIAP PAKAI
 
-1. Ekstrak SELURUH isi ZIP ke folder biasa, misalnya C:\LinguaPlayer.
-2. Klik LinguaPlayer.exe. Folder _internal wajib tetap bersamanya.
-3. Isi Gemini API key, lalu tekan Simpan API key di Windows.
-   Pada akun Windows yang sama, key terisi otomatis saat aplikasi dibuka kembali.
-   Hapus key tersimpan menghapus key dari Windows Credential Manager.
-4. Klik Buka video lalu Buat subtitle online.
-5. Bahasa sumber dideteksi dari suara. Bahasa tujuan default Indonesia.
-   Audio mulai diproses dari awal video per 10 detik; setelah buffer pertama siap,
-   pemutaran berjalan dan bagian berikutnya diproses di belakang layar.
-   Jika API lambat, video dijeda agar suara tidak mendahului subtitle.
-   Ini bukan jaminan live translation tanpa jeda; internet dan API memengaruhi waktu tunggu.
-6. Koreksi teks/timing pada tabel setelah proses selesai. Ekspor SRT untuk offline.
-7. Untuk menonton tanpa internet: buka video lalu Buka SRT offline.
+MULAI
+1. Ekstrak SELURUH ZIP ke folder baru. Jalankan LinguaPlayer.exe.
+2. Buka video atau klik Tambah film untuk memilih banyak film dengan Ctrl/Shift.
+3. Seluruh runtime VLC, 360 DLL plugin VLC dan FFmpeg dibundel; tidak perlu Python/VLC terpisah.
 
-Tidak perlu memasang Python atau VLC terpisah: runtime VLC dan FFmpeg dibundel.
-API key tidak ditanamkan pada EXE dan tidak masuk repository GitHub.
-Jangan jalankan dari dalam ZIP; ekstrak dahulu. Jangan pindahkan EXE sendirian.
-EXE belum memiliki tanda tangan penerbit/code signing.
+PLAYLIST
+- Panel kanan: + Film, urutkan naik/turun, drag untuk mengubah urutan, hapus pilihan.
+- Klik dua kali nama film untuk memutarnya.
+- Tambah folder tersedia di menu File; pemindaian hanya folder yang dipilih.
+- Film berikutnya otomatis, Acak, Ulang semua/Ulang satu bisa diatur.
+- Simpan/Buka daftar mendukung M3U8, M3U, dan JSON lokal.
+- Playlist masing-masing pemutar disimpan otomatis saat jendela ditutup.
+- Lokasi video dalam playlist harus tetap tersedia; file video tidak disalin ke playlist.
 
-PERBAIKAN VIDEO DAN PICTURE-IN-PICTURE
-- Mode bawaan Windows: Kompatibel (CPU / GDI), untuk menghindari masalah layar hitam GPU.
-- Jika perlu, pilih Otomatis (GPU) atau Direct3D11 melalui menu mode tampilan.
-- Tombol PiP membuka jendela kecil yang selalu di atas; ukurannya bisa diubah dan dipindah lewat title bar.
-- Play/Pause, subtitle, serta tombol Kembali ke pemutar tersedia dalam PiP.
-- Menutup PiP mengembalikan video ke pemutar utama; pause dan posisi dipertahankan.
-- Log video membuka log lokal untuk diagnosis. Log dapat memuat nama/lokasi video, tetapi tidak API key.
-- Seluruh plugin dalam distribusi VLC resmi dibundel. Daftarnya di CODEC_PLUGINS.txt.
-- Format umum: FLV, TS/MTS/M2TS, MP4, AVI, 3GP/3G2, MKV, MOV, WebM, WMV, MPEG, VOB, OGV, M4V.
-- Dukungan codec mengikuti VLC yang dibundel; file rusak, DRM atau codec tertentu tetap bisa gagal.
+DUA FILM BERSAMAAN
+- Klik Pemutar kedua. Dua jendela ditempatkan berdampingan.
+- Buka film lain di jendela kedua. Playlist, posisi, kecepatan dan subtitle masing-masing terpisah.
+- Jendela kedua dimulai dengan mute untuk menghindari suara bertumpuk; klik Mute untuk menyalakan suaranya.
+- Maksimal dua jendela melalui tombol ini. Dua video berat bergantung kemampuan komputer.
+- Permintaan subtitle kedua jendela diserialkan agar tidak membanjiri kuota Gemini.
+
+KONTROL
+- Space: Play/Pause; M: Mute.
+- Panah kiri / kanan: mundur / maju 5 detik.
+- Panah atas / bawah: maju / mundur 1 menit.
+- Kecepatan: 0,25 sampai 4 kali melalui kontrol Kecepatan.
+- F atau F11: Fullscreen; Esc: keluar fullscreen/PiP.
+- PageUp / PageDown: film sebelumnya / berikutnya.
+- Panah di kolom teks/tabel/playlist tetap digunakan untuk menyunting atau navigasi daftar; klik area video untuk memakai shortcut film.
+- Mode Windows bawaan Kompatibel (CPU/GDI) mengurangi ketergantungan pada driver GPU. Pilihan Otomatis/GPU dan Direct3D11 tersedia.
+- Log video membuka log lokal untuk diagnosis; dapat memuat lokasi/nama video, bukan API key.
+
+PIP DAN 3D
+- PiP: jendela kecil selalu di atas, dapat dipindah dan diubah ukurannya. Subtitle dan play/pause tersedia.
+- Setelan 3D: centang Aktifkan 3D, pilih Merah-cyan atau Merah-biru sesuai kacamata.
+- Atur nilai minus/plus Merah/mata kiri dan Cyan/biru/mata kanan untuk pergeseran kedua mata.
+- Pilih sumber 2D, SBS half/full, atau Top-Bottom half/full sesuai video. Tukar mata tersedia.
+- Video 2D hanya diberi pergeseran bidang buatan. Kedalaman objek stereo asli memerlukan sumber 3D SBS/TB.
+- Mode 3D memakai CPU, membatasi hasil pratinjau ke maksimal 960x540, dan dapat lebih berat dari pemutaran biasa.
+- Efek 3D hanya untuk tampilan; tidak mengubah file video asli.
+
+SUBTITLE OTOMATIS
+1. Klik Subtitle / AI pada toolbar.
+2. Isi Gemini API key. Simpan API key di Windows agar otomatis terisi pada akun Windows yang sama.
+3. Model bawaan gemini-3.5-flash-lite. Nama model dapat disesuaikan dengan model yang tersedia pada akun.
+4. Bahasa asal dideteksi dari suara; target bawaan Indonesia. Pilih/ketik bahasa lain bila perlu.
+5. Isi kamus ejaan untuk nama/istilah khusus, lalu klik Buat / Lanjutkan subtitle.
+6. Audio dikirim ke Google setelah konfirmasi. Audio per 10 detik diproses bertahap.
+7. Setelah buffer siap video diputar; jika API lambat video dijeda untuk menjaga urutan subtitle.
+8. Jika timeout/koneksi putus: hasil yang sudah selesai dipertahankan, tekan Buat / Lanjutkan subtitle pada sesi yang sama. Bagian sukses tidak dikirim ulang.
+9. Batas tunggu per permintaan 180 detik, maksimal dua percobaan untuk error sementara. Batal menunggu permintaan aktif berakhir.
+10. Tinjau teks/timing; Ekspor SRT untuk offline. Buka video lalu Buka SRT offline, atau gunakan SRT dengan nama sama di folder video untuk dimuat otomatis.
+11. Simpan proyek JSON untuk mempertahankan teks kedua bahasa dan timing. Key tidak masuk proyek.
+
+GRATIS DAN BATASAN
+- Gunakan proyek Gemini Free Tier tanpa billing. Aplikasi tidak dapat memverifikasi billing proyek hanya dari API key.
+- Model Lite memiliki opsi Free Tier untuk akun yang memenuhi syarat; ketersediaan/kuota tetap ditentukan Google.
+- Google Translate tidak dipanggil dalam UI versi ini, dan tidak ada fallback otomatis ke model/layanan berbayar.
+- Saat akses/kuota harian ditolak, proses berhenti dengan detail error. Jangan upgrade untuk melanjutkan secara gratis; tunggu kuota tersedia atau pilih model yang diizinkan akun.
+- Permintaan kedua jendela diserialkan dan diberi interval minimum 15 detik. Batas akun yang lebih rendah tetap bisa menghasilkan 429.
+- Timeout dari server/jaringan tidak dapat dihilangkan sepenuhnya. Akurasi dan sinkronisasi 100% tidak dijamin.
+- Belum mendukung URL YouTube, live microphone atau forced alignment; pemutar menggunakan file video lokal.
+- Format yang dapat diputar mengikuti VLC. File rusak, DRM dan codec khusus tetap mungkin gagal.
+- EXE belum memiliki code signing penerbit. Jangan memindahkan EXE sendirian dari folder _internal.
