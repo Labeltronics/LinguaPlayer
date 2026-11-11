@@ -80,10 +80,6 @@ def command(ff,p,target,work,mode='CPU',preview=False,still=None):
                 graph.append(f"color=c={vp.color(c['color']) if c['kind']=='color' else 'black@0'}:s={w}x{h}:r={s['fps']}:d={dur:.9g},format=rgba[{vlabel}]")
             if visible and vlabel is not None:
                 vl=f'visual{layer}';out=f'layer{layer}';layer+=1;filters=[f'setpts=(PTS-STARTPTS)/{c["speed"] if c["kind"]=="video" else 1:.9g}',f'fps={s["fps"]}',f'trim=duration={dur:.9g}','setsar=1','format=rgba']
-                if c['kind']=='text':
-                    text=work/f'title-{layer}.txt';text.write_text(c['text'],encoding='utf-8');face=font()
-                    if face is None:raise ValueError('Font sistem Arial/DejaVu Sans tidak ditemukan.')
-                    filters.append(f"drawtext=fontfile='{escaped(face)}':textfile='{text.name}':expansion=none:fontcolor={vp.color(c['color'])}:fontsize={max(6,round(h*c['font_size']/100))}:x=(w-tw)/2:y=(h-th)/2:box=1:boxcolor=black@0.3:boxborderw=5")
                 if c['rotation']==90:filters.append('transpose=1')
                 elif c['rotation']==180:filters+=['hflip','vflip']
                 elif c['rotation']==270:filters.append('transpose=2')
@@ -92,6 +88,10 @@ def command(ff,p,target,work,mode='CPU',preview=False,still=None):
                 if fit=='stretch':filters.append(f'scale={bw}:{bh}:flags=bicubic')
                 elif fit=='cover':filters+= [f'scale={bw}:{bh}:force_original_aspect_ratio=increase:flags=bicubic',f'crop={bw}:{bh}']
                 else:filters += [f'scale={bw}:{bh}:force_original_aspect_ratio=decrease:flags=bicubic',f'pad={bw}:{bh}:(ow-iw)/2:(oh-ih)/2:color=black@0']
+                if c['kind']=='text':
+                    text=work/f'title-{layer}.txt';text.write_text(c['text'],encoding='utf-8');face=font()
+                    if face is None:raise ValueError('Font sistem Arial/DejaVu Sans tidak ditemukan.')
+                    filters.append(f"drawtext=fontfile='{escaped(face)}':textfile='{text.name}':expansion=none:fontcolor={vp.color(c['color'])}:fontsize={max(6,round(h*c['font_size']/100))}:x=(w-tw)/2:y=(h-th)/2:box=1:boxcolor=black@0.3:boxborderw=5")
                 if c['brightness'] or c['contrast']!=1 or c['saturation']!=1:filters.append(f"eq=brightness={c['brightness']:.9g}:contrast={c['contrast']:.9g}:saturation={c['saturation']:.9g},format=rgba")
                 if c.get('chroma'):filters.append(f"chromakey={vp.color(c['chroma_color'])}:{c['chroma_similarity']:.9g}:{c['chroma_blend']:.9g},format=rgba")
                 if c.get('blur',0):filters.append(f"gblur=sigma={c['blur']:.9g}")

@@ -53,7 +53,11 @@ class ProjectTests(unittest.TestCase):
             clip['speed']=2;clip['duration']=.6;r.render(ff,p,d/'speed.mp4');clip['speed']=1;clip['duration']=1.2
             p['clips'].append(v.new_clip(p['tracks'][3]['id'],'text',duration=1.2,text="Cyber80's title: video",y=50,height=25))
             p['clips'].append(v.new_clip(p['tracks'][4]['id'],'subtitle',duration=1.2,text='1\n00:00:00,000 --> 00:00:01,100\nSubtitle Indonesia\n'))
-            r.render(ff,p,d/'captioned.mp4');r.render(ff,p,d/'still.png',still=.3);self.assertTrue((d/'still.png').read_bytes().startswith(b'\x89PNG'))
+            r.render(ff,p,d/'captioned.mp4')
+            caption=subprocess.run([ff,'-v','error','-ss','0.3','-i',str(d/'captioned.mp4'),'-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1'],check=True,stdout=subprocess.PIPE,**r.flags()).stdout
+            ys=[y for y in range(130,170) for x in range(20,300) if caption[(y*320+x)*3]>170 and caption[(y*320+x)*3+1]>170]
+            self.assertTrue(ys);self.assertGreaterEqual(max(ys)-min(ys),5,'Text became unreadably small inside its box')
+            r.render(ff,p,d/'still.png',still=.3);self.assertTrue((d/'still.png').read_bytes().startswith(b'\x89PNG'))
             self.assertEqual(hashlib.sha256(source.read_bytes()).digest(),checksum)
             with self.assertRaises(ValueError):r.render(ff,p,source)
             self.assertEqual(hashlib.sha256(source.read_bytes()).digest(),checksum)
