@@ -71,7 +71,7 @@ class AdvancedTests(unittest.TestCase):
     @patch.object(app.vlc,'Instance',side_effect=fake_engine)
     def test_resume_skips_successful_silent_chunk(self,factory):
         w=app.Window();w.path='example.mp4';w.key.setText('dummy');w.resume_offset=10;w.cues=[]
-        w.retry_context=(w.path,w.model.text(),'id','',json.dumps({'engine':'gemini'},sort_keys=True))
+        w.retry_context=(w.path,w.model.text(),'id','',json.dumps(w.ai_configuration(),sort_keys=True))
         fake_job=MagicMock();fake_job.isRunning.return_value=False
         try:
             with patch.object(app,'Job',return_value=fake_job) as job,patch.object(app.QMessageBox,'question',return_value=app.QMessageBox.Yes):

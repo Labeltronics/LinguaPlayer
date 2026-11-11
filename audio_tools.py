@@ -74,7 +74,7 @@ class AudioPanel(QWidget):
         for label,value in [('Stereo',1),('Balik stereo',2),('Kiri',3),('Kanan',4)]:self.channel.addItem(label,value)
         self.channel.currentIndexChanged.connect(self.apply_channel);row.addWidget(self.channel)
         row.addWidget(QLabel('Sinkron audio'));self.delay=QSpinBox();self.delay.setRange(-5000,5000);self.delay.setSingleStep(50);self.delay.setSuffix(' ms');self.delay.valueChanged.connect(self.apply_delay);row.addWidget(self.delay)
-        hint=QLabel('Preset Malam adalah pengaturan EQ lembut, bukan penyeragam volume otomatis. Auto-headroom mengurangi risiko clipping; tetap sesuaikan volume. Pilihan track ini hanya untuk pemutaran; AI memakai track audio default.');hint.setWordWrap(True);box.addWidget(hint)
+        hint=QLabel('Preset Malam adalah pengaturan EQ lembut, bukan penyeragam volume otomatis. Auto-headroom mengurangi risiko clipping; tetap sesuaikan volume. Pilihan track ini untuk pemutaran. Track sumber AI dipilih terpisah di panel Subtitle / AI.');hint.setWordWrap(True);box.addWidget(hint)
         row=QHBoxLayout();box.addLayout(row)
         export=QPushButton('Ekspor profil suara');export.clicked.connect(self.export_profile);row.addWidget(export)
         imp=QPushButton('Impor profil suara');imp.clicked.connect(self.import_profile);row.addWidget(imp)

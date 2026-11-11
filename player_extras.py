@@ -36,7 +36,7 @@ class PlayerExtras(CinemaTools):
         self.shuffle_box=QCheckBox('Acak');row.addWidget(self.shuffle_box)
         self.repeat_box=QComboBox();self.repeat_box.addItems(['Tanpa ulang','Ulang semua','Ulang satu']);row.addWidget(self.repeat_box)
         self.playlist_dock.setWidget(panel);self.addDockWidget(Qt.RightDockWidgetArea,self.playlist_dock)
-        toolbar=QToolBar('Kontrol lanjutan',self);toolbar.setMovable(False);self.addToolBar(toolbar)
+        toolbar=QToolBar('Kontrol lanjutan',self);self.advanced_toolbar=toolbar;toolbar.setObjectName('advanced');toolbar.setMovable(False);self.addToolBar(toolbar)
         def action(label,fn,checkable=False):
             a=QAction(label,self);a.setCheckable(checkable);a.triggered.connect(fn);toolbar.addAction(a);return a
         action('Tambah film',self.add_films);action('Sebelumnya',lambda:self.next_film(-1));action('Berikutnya',lambda:self.next_film(1))
@@ -79,7 +79,7 @@ class PlayerExtras(CinemaTools):
                 self.add_paths(read_playlist(source))
             except Exception:pass
         self.setup_cinema_tools(action)
-        self.configure_video_output()
+        self.configure_video_output();self.setup_modern_tools()
     def add_paths(self,paths):
         known={self.playlist_widget.item(i).data(Qt.UserRole) for i in range(self.playlist_widget.count())}
         for p in paths:
@@ -139,7 +139,7 @@ class PlayerExtras(CinemaTools):
             else:return
         self.play_item(self.playlist_widget.item(target))
     def extra_tick(self):
-        self.cinema_tick()
+        self.cinema_tick();self.modern_tick()
         if not self._end_handled and self.path and self.player.get_state()==vlc.State.Ended and not self.processing and self.job is None:
             self._end_handled=True
             if self.auto_next_box.isChecked():QTimer.singleShot(0,lambda:self.next_film(1,True))
@@ -208,8 +208,8 @@ class PlayerExtras(CinemaTools):
         self.add_paths(p for p in paths if Path(p).is_file());event.acceptProposedAction()
     def extras_cleanup(self):
         QApplication.instance().removeEventFilter(self);self.stereo_timer.stop()
-        if '--self-test' not in __import__('sys').argv and os.getenv('QT_QPA_PLATFORM')!='offscreen':
+        if self.storage_enabled:
             try:write_playlist(self.playlist_cache,[self.playlist_widget.item(i).data(Qt.UserRole) for i in range(self.playlist_widget.count())])
             except Exception:pass
-        self.cinema_cleanup()
+        self.modern_cleanup();self.cinema_cleanup()
         if self in PlayerExtras.windows:PlayerExtras.windows.remove(self)

@@ -17,6 +17,7 @@ if (-not (Test-Path (Join-Path $VlcDirectory 'libvlc.dll'))) { throw 'Pasang VLC
 if ($LASTEXITCODE -ne 0) { throw 'Build gagal.' }
 Copy-Item QUICK_START_ID.txt dist\Cyber80Players\
 Copy-Item AUDIT_CYBER80_PLAYERS_ID.md dist\Cyber80Players\
+Copy-Item PEMBARUAN_CYBER80_ID.md dist\Cyber80Players\
 Copy-Item AI_LOKAL_ID.md dist\Cyber80Players\
 Copy-Item LICENSE dist\Cyber80Players\
 Copy-Item README_ID.md dist\Cyber80Players\

@@ -1,3 +1,10 @@
+PEMBARUAN MODERN + SUBTITLE ATTACHMENT
+Baca PEMBARUAN_CYBER80_ID.md untuk seluruh perubahan dan batas pengujian.
+Personalisasi: tema/skin, aksen, simpan layout dan mode sederhana.
+Playback Pro: chapter, frame berikutnya, aspect/crop, rotasi, output audio dan koleksi.
+Subtitle latar belakang: pilih video attachment, lokasi SRT, tunggu notifikasi. Aplikasi harus tetap berjalan.
+Proxy MP4 untuk format lain/file besar atau track audio pilihan. Tidak ada API key tertanam.
+
 CYBER80 PLAYERS — PANDUAN WINDOWS
 
 1. Ekstrak SELURUH ZIP ke folder baru. Jalankan Cyber80Players.exe.

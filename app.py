@@ -29,6 +29,7 @@ class Job(QThread):
     def __init__(self, path, key, model, language, google, glossary, resume_from=0, initial_cues=None, local_config=None):
         super().__init__(); self.args=(path,key,model,language,google,glossary)
         self.resume_from=resume_from;self.start_offset=resume_from;self.initial_cues=list(initial_cues or []);self.local_config=local_config or {}
+        self.chunk_seconds=int(self.local_config.get('chunk_seconds',10));self.audio_stream=int(self.local_config.get('audio_stream',0))
     def run(self):
         path,key,model,lang,google,glossary=self.args
         cues=list(self.initial_cues)
@@ -41,7 +42,7 @@ class Job(QThread):
                     self.progress.emit(f'Mengekstrak audio {offset//60:02}:{offset%60:02} …')
                     out=str(Path(tmp)/'chunk.wav')
                     overlap=1 if offset>0 else 0
-                    p=subprocess.Popen([ff,'-v','error','-y','-ss',str(max(0,offset-overlap)),'-i',path,'-t',str(10+overlap),'-vn','-ac','1','-ar','16000',out],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,**flags)
+                    p=subprocess.Popen([ff,'-v','error','-y','-ss',str(max(0,offset-overlap)),'-i',path,'-t',str(self.chunk_seconds+overlap),'-map',f'0:a:{self.audio_stream}','-vn','-ac','1','-ar','16000',out],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,**flags)
                     while True:
                         try: _,err=p.communicate(timeout=.2); break
                         except subprocess.TimeoutExpired:
@@ -53,12 +54,12 @@ class Job(QThread):
                     self.progress.emit(f'Mentranskrip / menerjemahkan {offset//60:02}:{offset%60:02} …')
                     if self.local_config.get('engine')=='local':chunk=transcribe_local(Path(out).read_bytes(),self.local_config,lang,duration,offset,self.isInterruptionRequested,self.progress.emit,context_seconds=overlap)
                     else:chunk=transcribe(Path(out).read_bytes(),key,model,lang,duration,offset,google,self.isInterruptionRequested,glossary,progress=self.progress.emit,timeout=180,context_seconds=overlap)
-                    cues.extend(chunk);self.resume_from=offset+10;coverage=offset+duration-overlap
+                    cues.extend(chunk);self.resume_from=offset+self.chunk_seconds;coverage=offset+duration-overlap
                     self.chunk_ready.emit(chunk,coverage)
-                    final_chunk=duration<9.95+overlap
+                    final_chunk=duration<self.chunk_seconds-.05+overlap
                     self.checkpoint_ready.emit({'cues':list(cues),'coverage':coverage,'next_offset':self.resume_from,'complete':final_chunk})
                     if final_chunk: break
-                    offset+=10
+                    offset+=self.chunk_seconds
             if self.isInterruptionRequested(): raise InterruptedError('Dibatalkan')
             self.result.emit(cues)
         except Exception as e: self.failed.emit(str(e))
@@ -78,6 +79,7 @@ class PictureWindow(QDialog):
         owner.button(controls,'Kembali ke pemutar',owner.leave_pip)
         self.setStyleSheet('QDialog{background:black} QPushButton{padding:7px}')
     def closeEvent(self,event):
+        if self.background_job is not None and self.background_job.isRunning():self.status.setText('Subtitle attachment masih berjalan. Minimalkan aplikasi, atau batalkan pekerjaan dan tunggu selesai sebelum menutup.');event.ignore();return
         event.ignore();self.returning.emit()
 
 class Window(PlayerExtras,QMainWindow):
@@ -143,7 +145,7 @@ class Window(PlayerExtras,QMainWindow):
         self.setup_extras()
         self.timer=QTimer(self);self.timer.timeout.connect(self.tick);self.timer.start(100)
         QTimer.singleShot(0,self.bind_video)
-        self.setStyleSheet('QMainWindow,QWidget{background:#111827;color:#e5e7eb} QPushButton,QLineEdit,QComboBox,QSpinBox{padding:7px;background:#25334b;border:1px solid #41516c;border-radius:5px} QTableWidget{background:#172237} QPushButton:disabled{color:#6b7280}')
+        self.apply_theme()
     def make_engine(self,mode):
         options=['--ignore-config','--no-video-title-show','--no-osd','--video','--audio',
                  '--audio-time-stretch','--no-plugins-cache','--file-logging','--logfile='+str(self.log_path),'--verbose=2']
@@ -158,7 +160,14 @@ class Window(PlayerExtras,QMainWindow):
             elif mode==2:options+=['--avcodec-hw=none','--vout=direct3d11']
             elif mode==3:options+=['--avcodec-hw=d3d11va','--vout=direct3d11']
         sharp=self.sharpness.value() if hasattr(self,'sharpness') else 0
-        if sharp>0:options+=['--video-filter=sharpen','--sharpen-sigma='+str(sharp)]
+        filters=[]
+        if sharp>0:filters.append('sharpen');options+=['--sharpen-sigma='+str(sharp)]
+        rotation=getattr(self,'rotation','off')
+        if rotation!='off':filters.append('transform');options+=['--transform-type='+rotation]
+        if filters:options+=['--video-filter='+':'.join(filters)]
+        dsp=getattr(self,'audio_dsp','off')
+        if dsp=='normalize':options+=['--audio-filter=normvol','--norm-max-level=2.0']
+        elif dsp=='night':options+=['--audio-filter=compressor','--compressor-threshold=-18','--compressor-ratio=4','--compressor-attack=25','--compressor-release=100','--compressor-makeup-gain=2']
         engine=vlc.Instance(*options)
         if engine is None:raise RuntimeError('VLC tidak dapat memuat plugin codec yang dibundel.')
         return engine
@@ -241,7 +250,7 @@ class Window(PlayerExtras,QMainWindow):
             delete_key('Gemini');delete_key('GoogleTranslate');self.key.clear();self.google.clear()
             self.status.setText('API key tersimpan telah dihapus.')
         except Exception as e:self.error(str(e))
-    def error(self,message): QMessageBox.warning(self,'LinguaPlayer',message)
+    def error(self,message): QMessageBox.warning(self,'Cyber80 Players',message)
     def open_video(self):
         p,_=QFileDialog.getOpenFileName(self,'Pilih video atau audio','','Media (*.mp4 *.mkv *.avi *.flv *.ts *.mts *.m2ts *.3gp *.3g2 *.mov *.webm *.wmv *.mpg *.mpeg *.vob *.ogv *.m4v *.mp3 *.aac *.m4a *.flac *.wav *.ogg *.oga *.opus *.wma *.aif *.aiff *.ape *.ac3 *.eac3 *.dts *.mka *.amr *.wv *.tta *.caf *.au);;Semua file (*.*)')
         if p:
@@ -278,8 +287,8 @@ class Window(PlayerExtras,QMainWindow):
         if not resume:self.fill([]);self.coverage=0.
         self.retry_context=context
         self.player.set_pause(1);self.player.set_time(position*1000)
-        self.processing=True;self.buffering=True;self.want_play=True
-        self.offset.setValue(0);self.lang.setEnabled(False);self.ai_engine.setEnabled(False);self.seek.setEnabled(False);self.table.setEnabled(False);self.import_button.setEnabled(False)
+        self.processing=True;self.buffering=True;self.want_play=self.ai_policy.currentData()!='prepare'
+        self.set_ai_controls_enabled(False);self.offset.setValue(0);self.lang.setEnabled(False);self.ai_engine.setEnabled(False);self.seek.setEnabled(False);self.table.setEnabled(False);self.import_button.setEnabled(False)
         self.job=Job(self.path,self.key.text().strip(),self.model.text().strip(),lang,'',self.glossary.text().strip(),resume_from=position,initial_cues=self.cues,local_config=configuration)
         self.job.chunk_ready.connect(self.receive_chunk);self.job.checkpoint_ready.connect(self.save_ai_checkpoint);self.job.progress.connect(self.api_status.setText);self.job.result.connect(self.done);self.job.failed.connect(self.job_error);self.job.finished.connect(self.finished)
         self.open.setEnabled(False);self.load.setEnabled(False);self.generate.setEnabled(False);self.cancel.setEnabled(True);self.job.start()
@@ -297,7 +306,7 @@ class Window(PlayerExtras,QMainWindow):
             self.buffering=False
             if self.want_play:self.player.play()
     def finished(self):
-        self.processing=False;self.buffering=False;self.lang.setEnabled(True);self.ai_engine.setEnabled(True);self.seek.setEnabled(True);self.table.setEnabled(True);self.import_button.setEnabled(True)
+        self.set_ai_controls_enabled(True);self.processing=False;self.buffering=False;self.lang.setEnabled(True);self.ai_engine.setEnabled(True);self.seek.setEnabled(True);self.table.setEnabled(True);self.import_button.setEnabled(True)
         self.open.setEnabled(True);self.load.setEnabled(True);self.generate.setEnabled(True);self.cancel.setEnabled(False);self.job.deleteLater();self.job=None
     def done(self,cues):
         self.processing=False;self.buffering=False;self.retry_context=None;self.resume_offset=0
@@ -329,13 +338,14 @@ class Window(PlayerExtras,QMainWindow):
             if self.pending_pause:self.player.set_pause(1)
             self.pending_pause=False
         if not self.seek.isSliderDown():self.seek.setValue(max(0,int(self.player.get_position()*1000)))
-        if self.processing and self.want_play and self.player.get_time()/1000 >= self.coverage-.15:
+        if self.processing and self.want_play and self.ai_policy.currentData()=='wait' and self.player.get_time()/1000 >= self.coverage-.15:
             self.player.set_pause(1);self.buffering=True
             self.status.setText('Buffering: menunggu subtitle berikutnya agar suara dan teks tetap sinkron …')
         t=(self.player.get_time()-self.offset.value())/1000
         cue=next((c for c in self.cues if c.start<=t<c.end),None)
         self.subtitle.setText(('\n'.join(filter(None,[cue.source,cue.target])) if self.mode.currentIndex()==0 else (cue.target or cue.source) if self.mode.currentIndex()==1 else cue.source) if cue else '')
         if self.pip is not None:self.pip.caption.setText(self.subtitle.text())
+        self.update_overlay()
         if self.player.get_state()==vlc.State.Error and not self.playback_error_reported:
             self.playback_error_reported=True
             self.status.setText('VLC gagal memutar video. Pilih mode Kompatibel (CPU / GDI) atau lihat Log video. File rusak/DRM mungkin tidak didukung.')
@@ -371,6 +381,8 @@ class Window(PlayerExtras,QMainWindow):
                 self.open_path(data['video']);self.fill(cues);self.offset.setValue(int(data.get('offset_ms',0)))
             except Exception as e:self.error(str(e))
     def closeEvent(self,event):
+        if self.background_job is not None and self.background_job.isRunning():self.status.setText('Subtitle attachment masih berjalan. Minimalkan aplikasi, atau batalkan pekerjaan dan tunggu selesai sebelum menutup.');event.ignore();return
+        if self.utility_job is not None and self.utility_job.isRunning():self.cancel_utility();self.status.setText('Membatalkan alat media; tutup lagi setelah selesai.');event.ignore();return
         if self.export_job is not None and self.export_job.isRunning():self.cancel_export();self.status.setText('Membatalkan ekspor; tutup lagi setelah proses selesai.');event.ignore();return
         if self.job and self.job.isRunning():self.cancel_job();self.error('Tunggu pembatalan selesai sebelum menutup aplikasi.');event.ignore();return
         self.closing=True;self.leave_pip();self.timer.stop();self.extras_cleanup()

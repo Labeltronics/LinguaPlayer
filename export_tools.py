@@ -1,4 +1,4 @@
-import os,subprocess,tempfile,time,functools
+import os,subprocess,tempfile,time,functools,uuid
 from pathlib import Path
 from PySide6.QtCore import QThread,Signal
 import imageio_ffmpeg
@@ -44,7 +44,7 @@ class ExportJob(QThread):
             except OSError:pass
     def run(self):
         source,target,resolution,mode,sharpness,duration=self.args
-        target=Path(target);temporary=target.with_name(target.stem+'.cyber80-partial'+target.suffix)
+        target=Path(target);temporary=target.with_name(target.stem+'.'+uuid.uuid4().hex+'.cyber80-partial'+target.suffix)
         try:
             if Path(source).resolve()==target.resolve():raise ValueError('Hasil ekspor tidak boleh menimpa video sumber.')
             capabilities=export_capabilities(imageio_ffmpeg.get_ffmpeg_exe())[mode]
@@ -72,4 +72,6 @@ class ExportJob(QThread):
             os.replace(temporary,target);self.success.emit(str(target))
         except Exception as exc:
             temporary.unlink(missing_ok=True);self.failure.emit(str(exc))
-        finally:self.proc=None
+        finally:
+            if self.proc is not None and self.proc.stdout is not None:self.proc.stdout.close()
+            self.proc=None

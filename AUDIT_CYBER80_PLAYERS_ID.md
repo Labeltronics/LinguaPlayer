@@ -1,3 +1,7 @@
+# Status audit terbaru
+
+Lihat **PEMBARUAN_CYBER80_ID.md** untuk fitur baru, hasil uji dan kekurangan yang masih terbuka. Tabel di bawah adalah audit versi sebelumnya; beberapa batasan (skin, track AI, SQLite, kompresor, attachment) sudah berubah pada pembaruan ini.
+
 # Audit dan roadmap Cyber80 Players
 
 Tanggal audit: 11 November 2026. Dasar pemeriksaan: kode aplikasi, tes otomatis, dan build Windows x64. Ini daftar temuan yang diketahui, bukan jaminan bahwa seluruh cacat perangkat lunak sudah ditemukan. Sasaran produk adalah pemutar video/audio dengan subtitle AI, dua jendela independen, profil suara, 3D anaglyph, dan alat peningkatan resolusi.

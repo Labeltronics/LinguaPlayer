@@ -24,7 +24,14 @@ def run_playback_checks(window):
     formats=[('mp4','libx264','aac'),('flv','flv1','libmp3lame'),('ts','mpeg2video','mp2'),
              ('avi','mpeg4','libmp3lame'),('3gp','h263','aac'),('mkv','libx264','aac'),
              ('mov','libx264','aac'),('webm','libvpx-vp9','libopus')]
-    report={'formats':{},'pip':{},'advanced':{}}
+    report={'formats':{},'pip':{},'advanced':{},'modern':{}}
+    from themes import THEMES
+    for name in THEMES:window.select_theme(name)
+    window.select_theme('Cyber Neon');window.set_simple_mode(True)
+    if not window.advanced_toolbar.isHidden():raise RuntimeError('Simple mode toolbar not hidden')
+    window.set_simple_mode(False);report['modern']['themes_and_simple_mode']='PASS'
+    if window.ai_configuration()['chunk_seconds']!=30:raise RuntimeError('AI chunk default incorrect')
+    report['modern']['ai_policies_and_source_track']='PASS'
     window.auto_next_box.setChecked(False)
     flags={'creationflags':subprocess.CREATE_NO_WINDOW} if __import__('os').name=='nt' else {}
     with tempfile.TemporaryDirectory(prefix='lingua-playback-') as tmp:
@@ -133,6 +140,13 @@ def run_playback_checks(window):
         window.sharpness.setValue(.1);wait_for(lambda:window.pending_seek is None and picture_stats(window)['displayed']>=3)
         report['advanced']['native_sharpen']='PASS'
         window.sharpness.setValue(0);window.player.stop()
+        window.select_rotation('90');window.player.play();wait_for(lambda:window.pending_seek is None and picture_stats(window)['displayed']>=3)
+        report['modern']['native_rotation_playback']='PASS';window.select_rotation('off');window.player.stop()
+        audio_source=str(Path(tmp)/'Audio wav.wav')
+        window.open_path(audio_source);wait_for(lambda:picture_stats(window)['audio_decoded']>2)
+        for mode in ('night','normalize'):
+            window.select_dsp(mode);wait_for(lambda:window.pending_seek is None and picture_stats(window)['audio_decoded']>2);report['modern']['native_audio_'+mode]='PASS'
+        window.select_dsp('off');window.player.stop()
         tiny=Path(tmp)/'Upscale input.mp4'
         subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','color=blue:size=176x144:rate=1:duration=1','-frames:v','1','-c:v','libx264','-pix_fmt','yuv420p',str(tiny)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,**flags)
         from export_tools import ExportJob,RESOLUTIONS,export_capabilities

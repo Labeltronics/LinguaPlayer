@@ -29,7 +29,9 @@ class ThumbnailJob(QThread):
 def stamp(ms):
     s=max(0,int(ms)//1000);return f'{s//3600:02}:{s//60%60:02}:{s%60:02}'
 
-class CinemaTools:
+from modern_tools import ModernTools
+
+class CinemaTools(ModernTools):
     def setup_cinema_tools(self,action):
         self.storage_enabled='--self-test' not in sys.argv and os.getenv('QT_QPA_PLATFORM')!='offscreen'
         self.media_store=MediaStore.shared(self.log_path.parent/'media-library.json',self.storage_enabled)
@@ -88,7 +90,9 @@ class CinemaTools:
         self.key.setEnabled(not local);self.model.setEnabled(not local)
         self.api_status.setText('AI lokal: server/model Whisper dan Ollama diperlukan; audio hanya dikirim ke loopback.' if local else 'Gemini: gunakan proyek Free Tier tanpa billing; kuota dan model mengikuti akun Google.')
     def ai_configuration(self):
-        return {'engine':self.ai_engine.currentData(),'speech_url':self.local_speech.text().strip(),'translate_url':self.local_translate.text().strip(),'model':self.local_model.text().strip()} if self.ai_engine.currentData()=='local' else {'engine':'gemini'}
+        config={'engine':self.ai_engine.currentData(),'chunk_seconds':self.ai_chunk.value(),'audio_stream':self.ai_stream.value()}
+        if config['engine']=='local':config.update(speech_url=self.local_speech.text().strip(),translate_url=self.local_translate.text().strip(),model=self.local_model.text().strip())
+        return config
     def current_ai_context(self,lang):return [self.model.text().strip() if self.ai_engine.currentData()=='gemini' else 'local',lang,self.glossary.text().strip(),self.ai_configuration()]
     def show_sound(self):self.sound_dock.show();self.sound_dock.raise_();self.audio_panel.refresh_tracks()
     def filter_library(self,text):
