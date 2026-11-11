@@ -71,6 +71,32 @@ class ControlsTests(unittest.TestCase):
             for job in list(manager.jobs.values()):job.stop();job.wait(2000)
             q.processEvents();w.close();http.shutdown();http.server_close();thread.join()
     @patch.object(app.vlc,'Instance',side_effect=fake_engine)
+    def test_native_download_finalizes_on_finished_signal(self,factory):
+        from PySide6.QtCore import QObject,Signal
+        from types import SimpleNamespace
+        class Request(QObject):
+            receivedBytesChanged=Signal();totalBytesChanged=Signal();stateChanged=Signal();isFinishedChanged=Signal()
+            def __init__(self):super().__init__();self.finished=False;self.phase='DownloadInProgress'
+            def suggestedFileName(self):return 'native.bin'
+            def setDownloadDirectory(self,value):self.directory=Path(value)
+            def setDownloadFileName(self,value):self.filename=value
+            def receivedBytes(self):return 7
+            def totalBytes(self):return 7
+            def isFinished(self):return self.finished
+            def state(self):return SimpleNamespace(name=self.phase)
+            def accept(self):pass
+        w=app.Window();manager=w.get_download_manager();request=Request()
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                target=Path(d)/'native.bin'
+                with patch('download_manager.QFileDialog.getSaveFileName',return_value=(str(target),'')):manager.accept_native(request,True)
+                (request.directory/request.filename).write_bytes(b'fixture')
+                request.phase='DownloadCompleted';request.stateChanged.emit();self.assertFalse(target.exists())
+                request.finished=True;request.isFinishedChanged.emit()
+                self.assertEqual(target.read_bytes(),b'fixture');self.assertEqual(manager.records[-1]['status'],'Completed');self.assertFalse(request.directory.exists())
+                request.isFinishedChanged.emit();self.assertEqual(target.read_bytes(),b'fixture')
+        finally:request.finished=True;w.close();q.processEvents()
+    @patch.object(app.vlc,'Instance',side_effect=fake_engine)
     def test_snapshot_fallback_and_source_protection(self,factory):
         import subprocess,time,imageio_ffmpeg
         w=app.Window()

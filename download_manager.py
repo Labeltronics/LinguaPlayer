@@ -191,17 +191,20 @@ class DownloadManager(QDialog):
         r={'id':rid,'target':target,'name':Path(target).name,'kind':'native','private':bool(private or self.owner.private_session),'status':'Running','received':0,'total':0,'message':'Sesi browser; resume lintas restart perlu dimulai lagi dari halaman.'};self.records.append(r);self.native[rid]=request
         request.setDownloadDirectory(str(temp));request.setDownloadFileName(Path(target).name)
         def update():
-            if r['status']=='Completed':return
+            if r['status'] in ('Completed','Cancelled','Failed'):return
             r['received']=request.receivedBytes();r['total']=max(0,request.totalBytes())
             if request.isFinished():
                 name=request.state().name
                 if name=='DownloadCompleted':
                     if target_stamp(target)!=stamp:self.result(r,'Failed','Tujuan berubah; file browser tetap di folder sementara.');return
-                    os.replace(temp/Path(target).name,target);shutil.rmtree(temp,ignore_errors=True);self.result(r,'Completed','Selesai')
+                    try:os.replace(temp/Path(target).name,target)
+                    except OSError:
+                        self.result(r,'Failed','File browser belum dapat dipindahkan. Hasil tetap di folder sementara: '+str(temp));return
+                    shutil.rmtree(temp,ignore_errors=True);self.result(r,'Completed','Selesai')
                 elif name=='DownloadCancelled':self.result(r,'Cancelled','Dibatalkan');shutil.rmtree(temp,ignore_errors=True)
                 else:self.result(r,'Failed','Unduhan browser terputus; ulangi dari halaman sumber.')
             else:self.refresh()
-        request.receivedBytesChanged.connect(update);request.totalBytesChanged.connect(update);request.stateChanged.connect(update);request.accept();self.show();self.refresh()
+        request.receivedBytesChanged.connect(update);request.totalBytesChanged.connect(update);request.stateChanged.connect(update);request.isFinishedChanged.connect(update);request.accept();self.show();self.refresh()
     def active(self):return bool(self.jobs) or any(not req.isFinished() for req in self.native.values())
     def shutdown(self):
         self.timer.stop();self.save()

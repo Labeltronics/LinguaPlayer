@@ -70,7 +70,7 @@ Pilih lokasi hasil sebelum proses. Terdapat pembatalan dan notifikasi serta tomb
 
 ## Bukti dan batas pengujian
 
-88 tes otomatis lokal mencakup suite sebelumnya ditambah HTTP server sungguhan untuk resume/paralel/fallback, redirect/cookie isolation, HTTP403, checksum, target berubah, disk penuh, HLS dan DASH nyata lalu remux FFmpeg, kontrol speed/scroll/zoom, trim range, stereo packing dan inference model MiDaS CPU asli. Subtes FFmpeg mencakup hard subtitle, video lirik, pemotongan video/audio dan alat sebelumnya.
+90 tes otomatis lokal mencakup suite sebelumnya ditambah HTTP server sungguhan untuk resume/paralel/fallback, redirect/cookie isolation, HTTP403, checksum, target berubah, disk penuh, HLS dan DASH nyata lalu remux FFmpeg, kontrol speed/scroll/zoom, trim range, stereo packing dan inference model MiDaS CPU asli. Subtes FFmpeg mencakup hard subtitle, video lirik, pemotongan video/audio dan alat sebelumnya.
 
 Laporan Windows di HASIL_UJI_WINDOWS.json mencatat tes EXE yang benar-benar dijalankan, termasuk browser lokal, deteksi MIME/DOM, pemutaran WebM/WAV, download HTTP/native Chromium, cutting visual, zoom/capture/reset, dan preview/ekspor stereo MiDaS. Hanya klaim PASS yang tercatat boleh dianggap teruji di build tersebut. Browser cloud Linux tanpa display GPU mengalami masalah renderer; hasil itu tidak dipromosikan sebagai pengujian browser sukses.
 
