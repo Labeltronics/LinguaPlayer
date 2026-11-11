@@ -26,14 +26,15 @@ jobs:
       - name: Test packaged EXE startup
         shell: pwsh
         run: |
-          $p = Start-Process dist\LinguaPlayer\LinguaPlayer.exe -ArgumentList '--self-test', "$env:RUNNER_TEMP\lingua-test.json" -PassThru -Wait
+          $p = Start-Process dist\Cyber80Players\Cyber80Players.exe -ArgumentList '--self-test', "$env:RUNNER_TEMP\lingua-test.json" -PassThru -Wait
           if ($p.ExitCode -ne 0) {
             Get-Content "$env:RUNNER_TEMP\lingua-test.json" -ErrorAction SilentlyContinue
-            Get-Content "$env:LOCALAPPDATA\LinguaPlayer\playback.log" -Tail 100 -ErrorAction SilentlyContinue
+            Get-Content "$env:LOCALAPPDATA\Cyber80 Players\playback.log" -Tail 100 -ErrorAction SilentlyContinue
             throw 'EXE playback self-test failed'
           }
           Get-Content "$env:RUNNER_TEMP\lingua-test.json"
+          Copy-Item "$env:RUNNER_TEMP\lingua-test.json" dist\Cyber80Players\HASIL_UJI_WINDOWS.json
       - uses: actions/upload-artifact@v4
         with:
-          name: LinguaPlayer-Windows-x64
-          path: dist/LinguaPlayer/
+          name: Cyber80Players-Windows-x64
+          path: dist/Cyber80Players/

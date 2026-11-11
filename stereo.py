@@ -40,9 +40,12 @@ def compose_anaglyph(frame,red=0,blue=0,layout='2d',scheme='red-cyan',swap=False
 
 class VideoSurface(QFrame):
     def __init__(self):
-        super().__init__();self.image=None;self.setFocusPolicy(Qt.StrongFocus)
+        super().__init__();self.image=None;self.audio_title='';self.setFocusPolicy(Qt.StrongFocus)
     def paintEvent(self,event):
-        if self.image is None:return super().paintEvent(event)
+        if self.image is None:
+            if self.audio_title:
+                painter=QPainter(self);painter.fillRect(self.rect(),QColor('black'));painter.setPen(QColor('#75d8ff'));painter.drawText(self.rect(),Qt.AlignCenter|Qt.TextWordWrap,self.audio_title+'\nAudio Studio / Equalizer');return
+            return super().paintEvent(event)
         painter=QPainter(self);painter.fillRect(self.rect(),QColor('black'))
         size=self.image.size().scaled(self.size(),Qt.KeepAspectRatio)
         x=(self.width()-size.width())//2;y=(self.height()-size.height())//2

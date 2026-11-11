@@ -8,17 +8,19 @@ from PySide6.QtWidgets import (QApplication,QWidget,QVBoxLayout,QHBoxLayout,QLab
 import vlc
 from playlist import read_playlist,write_playlist
 from stereo import MemoryVideo,compose_anaglyph
+from cinema_tools import CinemaTools
 
+AUDIO_SUFFIXES={'.mp3','.aac','.m4a','.flac','.wav','.ogg','.oga','.opus','.wma','.aif','.aiff','.ape','.ac3','.eac3','.dts','.mka','.amr','.wv','.tta','.caf','.au'}
 VIDEO_SUFFIXES={'.mp4','.mkv','.avi','.flv','.ts','.mts','.m2ts','.3gp','.3g2','.mov','.webm','.wmv','.mpg','.mpeg','.vob','.ogv','.m4v'}
 
-class PlayerExtras:
+class PlayerExtras(CinemaTools):
     windows=[]
     def setup_extras(self):
         self.memory_video=None;self.stereo_on=False;self._last_frame_revision=-1;self._last_frame=None
         self._end_handled=False;self._fullscreen_was_pip=False
         self.window_number=next(i for i in (1,2,3) if all(getattr(w,'window_number',None)!=i for w in PlayerExtras.windows))
         PlayerExtras.windows.append(self)
-        self.setWindowTitle(f'LinguaPlayer • Pemutar {self.window_number}')
+        self.setWindowTitle(f'Cyber80 Players • Pemutar {self.window_number}')
         self.setAcceptDrops(True)
         self.playlist_widget=QListWidget();self.playlist_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.playlist_widget.setDragDropMode(QAbstractItemView.InternalMove)
@@ -63,7 +65,7 @@ class PlayerExtras:
         action('Subtitle / AI',lambda:(self.subtitle_dock.show(),self.subtitle_dock.raise_()))
         action('Setelan 3D',lambda:(self.stereo_dock.show(),self.stereo_dock.raise_()))
         file_menu=self.menuBar().addMenu('File')
-        for name,fn in [('Buka video (Ctrl+O)',self.open_video),('Tambah banyak film',self.add_films),('Tambah folder',self.add_folder),('Buka playlist',self.load_playlist),('Simpan playlist',self.save_playlist),('Kosongkan playlist',self.playlist_widget.clear),('Buka pemutar kedua',self.open_second_player)]:file_menu.addAction(name,fn)
+        for name,fn in [('Buka video/audio (Ctrl+O)',self.open_video),('Tambah banyak media',self.add_films),('Tambah folder',self.add_folder),('Buka playlist',self.load_playlist),('Simpan playlist',self.save_playlist),('Kosongkan playlist',self.playlist_widget.clear),('Buka pemutar kedua',self.open_second_player)]:file_menu.addAction(name,fn)
         play_menu=self.menuBar().addMenu('Pemutaran')
         for name,fn in [('Play / Pause (Space)',self.play),('Stop',self.stop),('Mundur 5 detik (←)',lambda:self.seek_relative(-5)),('Maju 5 detik (→)',lambda:self.seek_relative(5)),('Maju 1 menit (↑)',lambda:self.seek_relative(60)),('Mundur 1 menit (↓)',lambda:self.seek_relative(-60)),('Film sebelumnya (PageUp)',lambda:self.next_film(-1)),('Film berikutnya (PageDown)',lambda:self.next_film(1))]:play_menu.addAction(name,fn)
         view=self.menuBar().addMenu('Tampilan');view.addAction('Fullscreen (F / F11)',self.toggle_fullscreen);view.addAction('PiP',self.toggle_pip);view.addAction(self.playlist_dock.toggleViewAction());view.addAction(self.subtitle_dock.toggleViewAction());view.addAction(self.stereo_dock.toggleViewAction())
@@ -72,8 +74,11 @@ class PlayerExtras:
         QApplication.instance().installEventFilter(self)
         self.playlist_cache=self.log_path.parent/f'playlist-{self.window_number}.json'
         if '--self-test' not in __import__('sys').argv and os.getenv('QT_QPA_PLATFORM')!='offscreen':
-            try:self.add_paths(read_playlist(self.playlist_cache))
+            try:
+                source=self.playlist_cache if self.playlist_cache.exists() else self.log_path.parent.parent/'LinguaPlayer'/f'playlist-{self.window_number}.json'
+                self.add_paths(read_playlist(source))
             except Exception:pass
+        self.setup_cinema_tools(action)
         self.configure_video_output()
     def add_paths(self,paths):
         known={self.playlist_widget.item(i).data(Qt.UserRole) for i in range(self.playlist_widget.count())}
@@ -82,12 +87,12 @@ class PlayerExtras:
             if path in known:continue
             item=QListWidgetItem(Path(path).name);item.setData(Qt.UserRole,path);item.setToolTip(path);self.playlist_widget.addItem(item);known.add(path)
     def add_films(self):
-        paths,_=QFileDialog.getOpenFileNames(self,'Tambahkan beberapa film (Ctrl/Shift untuk memilih)','','Video (*.*)')
+        paths,_=QFileDialog.getOpenFileNames(self,'Tambahkan beberapa video/audio (Ctrl/Shift untuk memilih)','','Video / Audio (*.*)')
         self.add_paths(paths)
         if paths and not self.path:self.play_item(self.playlist_widget.item(0))
     def add_folder(self):
         folder=QFileDialog.getExistingDirectory(self,'Pilih folder film')
-        if folder:self.add_paths(str(p) for p in sorted(Path(folder).iterdir()) if p.is_file() and p.suffix.lower() in VIDEO_SUFFIXES)
+        if folder:self.add_paths(str(p) for p in sorted(Path(folder).iterdir()) if p.is_file() and p.suffix.lower() in VIDEO_SUFFIXES|AUDIO_SUFFIXES)
     def play_item(self,item):
         if item is None:return
         if self.job is not None and self.job.isRunning():self.status.setText('Batalkan proses subtitle sebelum mengganti film.');return
@@ -97,8 +102,8 @@ class PlayerExtras:
         self._end_handled=False;self.add_paths([path])
         for i in range(self.playlist_widget.count()):
             if self.playlist_widget.item(i).data(Qt.UserRole)==path:self.playlist_widget.setCurrentRow(i);break
-        self.setWindowTitle(f'LinguaPlayer {self.window_number} • '+Path(path).name)
-        self.apply_speed();self.player.audio_set_mute(self.mute_action.isChecked())
+        self.setWindowTitle(f'Cyber80 Players {self.window_number} • '+Path(path).name)
+        self.apply_speed();self.player.audio_set_mute(self.mute_action.isChecked());self.cinema_opened()
         subtitle=Path(path).with_suffix('.srt')
         if subtitle.is_file():
             try:
@@ -134,6 +139,7 @@ class PlayerExtras:
             else:return
         self.play_item(self.playlist_widget.item(target))
     def extra_tick(self):
+        self.cinema_tick()
         if not self._end_handled and self.path and self.player.get_state()==vlc.State.Ended and not self.processing and self.job is None:
             self._end_handled=True
             if self.auto_next_box.isChecked():QTimer.singleShot(0,lambda:self.next_film(1,True))
@@ -150,12 +156,12 @@ class PlayerExtras:
     def set_muted(self,value):self.player.audio_set_mute(bool(value))
     def toggle_fullscreen(self):
         if self.pip is not None and self.pip.isFullScreen():
-            if self._fullscreen_was_pip:self.pip.showNormal()
+            if self._fullscreen_was_pip:self.pip.showNormal();self.pip.full_button.setText('Fullscreen (F11)')
             else:self.leave_pip()
         else:
             self._fullscreen_was_pip=self.pip is not None
             if self.pip is None:self.toggle_pip()
-            if self.pip:self.pip.showFullScreen()
+            if self.pip:self.pip.full_button.setText('Keluar fullscreen (Esc)');self.pip.showFullScreen()
     def toggle_stereo(self,enabled):
         self.stereo_on=bool(enabled);self._last_frame_revision=-1;self._last_frame=None
         self.video.clear_frame();self.change_renderer(self.renderer.currentIndex())
@@ -167,7 +173,7 @@ class PlayerExtras:
         try:self.player.video_set_key_input(False);self.player.video_set_mouse_input(False)
         except Exception:pass
     def render_stereo(self,force=False):
-        if not self.stereo_on or self.memory_video is None:return
+        if not self.stereo_on or self.memory_video is None or self.video.audio_title:return
         frame,revision=self.memory_video.snapshot()
         if frame is None or (not force and revision==self._last_frame_revision):return
         self._last_frame_revision=revision
@@ -185,7 +191,7 @@ class PlayerExtras:
         other.status.setText('Pemutar kedua siap. Suara awal mute; klik Mute untuk mengaktifkan suara.')
         return other
     def eventFilter(self,obj,event):
-        if event.type()==QEvent.KeyPress and QApplication.activeWindow() in (self,getattr(self,'pip',None)):
+        if event.type()==QEvent.KeyPress and QApplication.activeWindow() is not None and QApplication.activeWindow() in (self,getattr(self,'pip',None)):
             if event.key()==Qt.Key_O and event.modifiers() & Qt.ControlModifier:self.open_video();return True
             focused=QApplication.focusWidget()
             if not isinstance(focused,(QLineEdit,QAbstractSpinBox,QComboBox,QAbstractItemView)):
@@ -205,4 +211,5 @@ class PlayerExtras:
         if '--self-test' not in __import__('sys').argv and os.getenv('QT_QPA_PLATFORM')!='offscreen':
             try:write_playlist(self.playlist_cache,[self.playlist_widget.item(i).data(Qt.UserRole) for i in range(self.playlist_widget.count())])
             except Exception:pass
+        self.cinema_cleanup()
         if self in PlayerExtras.windows:PlayerExtras.windows.remove(self)

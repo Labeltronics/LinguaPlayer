@@ -104,4 +104,45 @@ def run_playback_checks(window):
         wait_for(lambda:window.path==b and picture_stats(window)['displayed']>=2,timeout=12)
         report['advanced']['playlist_auto_next']='PASS'
         window.auto_next_box.setChecked(False);window.player.stop()
+        report['audio_formats']={}
+        audio_formats=[('wav','pcm_s16le','wav'),('mp3','libmp3lame','mp3'),('aac','aac','aac'),('flac','flac','flac'),('ogg','libvorbis','ogg'),('opus','libopus','opus'),('m4a-aac','aac','m4a'),('alac','alac','m4a'),('wma','wmav2','wma'),('ac3','ac3','ac3'),('eac3','eac3','eac3'),('aiff','pcm_s16be','aiff')]
+        for name,codec,suffix in audio_formats:
+            clip=Path(tmp)/('Audio '+name+'.'+suffix)
+            subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','sine=frequency=440:duration=3','-ac','2','-ar','48000' if codec=='libopus' else '44100','-c:a',codec,str(clip)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,**flags)
+            window.open_path(str(clip));wait_for(lambda:picture_stats(window)['audio_decoded']>2)
+            report['audio_formats'][name]={'status':'PASS','decoded_audio':picture_stats(window)['audio_decoded']};window.player.stop()
+        window.open_path(str(long_clip));wait_for(lambda:picture_stats(window)['displayed']>=3)
+        window.audio_panel.preset.setCurrentText('Film — aksi');window.audio_panel.apply()
+        if window.audio_panel.native is None:raise RuntimeError('Native equalizer handle missing')
+        for i,gain in enumerate([5,4,1,-1,0,2,3,2,1,0]):
+            if abs(window.audio_panel.native.get_amp_at_index(i)-gain)>.01:raise RuntimeError('EQ band value mismatch')
+        report['advanced']['equalizer_10_bands']='PASS'
+        window.toggle_pip();wait_for(lambda:window.pip is not None and window.pending_seek is None)
+        window.leave_pip();wait_for(lambda:window.pip is None and window.pending_seek is None)
+        if not window.audio_panel.enabled.isChecked():raise RuntimeError('EQ settings lost')
+        report['advanced']['equalizer_pip_persistence']='PASS'
+        window.player.set_time(10000);wait_for(lambda:window.player.get_time()>=9800)
+        window.mark_ab();window.player.set_time(12000);wait_for(lambda:window.player.get_time()>=11800);window.mark_ab()
+        window.player.set_time(window.ab_b+100);wait_for(lambda:window.player.get_time()<window.ab_b)
+        window.mark_ab();report['advanced']['ab_repeat']='PASS'
+        window.save_film_profile()
+        if 'profile' not in window.media_store.get(window.path):raise RuntimeError('Media profile missing')
+        report['advanced']['media_profile']='PASS'
+        snapshot=Path(tmp)/'snapshot.png';window.capture_frame(str(snapshot));wait_for(lambda:snapshot.is_file() and snapshot.stat().st_size>0)
+        report['advanced']['snapshot']='PASS'
+        window.sharpness.setValue(.1);wait_for(lambda:window.pending_seek is None and picture_stats(window)['displayed']>=3)
+        report['advanced']['native_sharpen']='PASS'
+        window.sharpness.setValue(0);window.player.stop()
+        tiny=Path(tmp)/'Upscale input.mp4'
+        subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','color=blue:size=176x144:rate=1:duration=1','-frames:v','1','-c:v','libx264','-pix_fmt','yuv420p',str(tiny)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,**flags)
+        from export_tools import ExportJob,RESOLUTIONS,export_capabilities
+        report['upscale_cpu']={}
+        for resolution,expected in RESOLUTIONS.items():
+            target=Path(tmp)/(resolution.replace(' ','_')+'.mp4');job=ExportJob(str(tiny),str(target),resolution,'CPU',.1,1);failures=[];success=[]
+            job.failure.connect(failures.append);job.success.connect(success.append);job.run()
+            if failures or not success:raise RuntimeError('CPU upscale failed: '+str(failures))
+            reader=imageio_ffmpeg.read_frames(str(target));size=next(reader)['size'];reader.close()
+            if tuple(size)!=expected:raise RuntimeError('Upscale resolution mismatch')
+            report['upscale_cpu'][resolution]={'status':'PASS','size':list(size)}
+        report['gpu_export']={'physical_gpu_test':'NOT_PERFORMED_ON_CI','compiled_support':export_capabilities(ff)}
     return report

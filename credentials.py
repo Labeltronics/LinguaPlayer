@@ -26,20 +26,25 @@ def save_key(name,value):
     encoded=value.encode('utf-16-le')
     if not encoded or len(encoded)>2560:raise ValueError('API key kosong atau terlalu panjang.')
     blob=(ctypes.c_ubyte*len(encoded)).from_buffer_copy(encoded)
-    credential=CREDENTIAL();credential.Type=1;credential.TargetName='LinguaPlayer/'+name
-    credential.UserName='LinguaPlayer';credential.CredentialBlobSize=len(encoded);credential.CredentialBlob=blob;credential.Persist=2
+    credential=CREDENTIAL();credential.Type=1;credential.TargetName='Cyber80Players/'+name
+    credential.UserName='Cyber80 Players';credential.CredentialBlobSize=len(encoded);credential.CredentialBlob=blob;credential.Persist=2
     if not api().CredWriteW(ctypes.byref(credential),0):raise ctypes.WinError(ctypes.get_last_error())
 
 def load_key(name):
-    dll=api();pointer=ctypes.POINTER(CREDENTIAL)()
-    if not dll.CredReadW('LinguaPlayer/'+name,1,0,ctypes.byref(pointer)):
-        code=ctypes.get_last_error()
-        if code==1168:return ''
-        raise ctypes.WinError(code)
-    try:return ctypes.string_at(pointer.contents.CredentialBlob,pointer.contents.CredentialBlobSize).decode('utf-16-le')
-    finally:dll.CredFree(pointer)
+    dll=api()
+    for prefix in ('Cyber80Players/','LinguaPlayer/'):
+        pointer=ctypes.POINTER(CREDENTIAL)()
+        if not dll.CredReadW(prefix+name,1,0,ctypes.byref(pointer)):
+            code=ctypes.get_last_error()
+            if code==1168:continue
+            raise ctypes.WinError(code)
+        try:return ctypes.string_at(pointer.contents.CredentialBlob,pointer.contents.CredentialBlobSize).decode('utf-16-le')
+        finally:dll.CredFree(pointer)
+    return ''
 
 def delete_key(name):
-    if not api().CredDeleteW('LinguaPlayer/'+name,1,0):
-        code=ctypes.get_last_error()
-        if code!=1168:raise ctypes.WinError(code)
+    dll=api()
+    for prefix in ('Cyber80Players/','LinguaPlayer/'):
+        if not dll.CredDeleteW(prefix+name,1,0):
+            code=ctypes.get_last_error()
+            if code!=1168:raise ctypes.WinError(code)

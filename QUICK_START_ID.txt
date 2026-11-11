@@ -1,66 +1,71 @@
-LINGUAPLAYER — WINDOWS SIAP PAKAI
+CYBER80 PLAYERS — PANDUAN WINDOWS
 
-MULAI
-1. Ekstrak SELURUH ZIP ke folder baru. Jalankan LinguaPlayer.exe.
-2. Buka video atau klik Tambah film untuk memilih banyak film dengan Ctrl/Shift.
-3. Seluruh runtime VLC, 360 DLL plugin VLC dan FFmpeg dibundel; tidak perlu Python/VLC terpisah.
+1. Ekstrak SELURUH ZIP ke folder baru. Jalankan Cyber80Players.exe.
+   Jangan pindahkan EXE sendirian: folder _internal wajib menyertainya.
+2. Buka media menerima video dan audio. Tambah film/+Film dapat memilih banyak file.
+   Playlist: drag untuk mengurutkan, hapus pilihan, repeat/shuffle, simpan/buka M3U8/JSON.
+   Tambah folder tersedia di menu File. Cari nama/lokasi di panel playlist.
+3. Full screen (F11) ada di dekat Play/PiP. Esc kembali.
+   Space Play/Pause; M Mute; kiri/kanan mundur/maju 5 detik;
+   atas/bawah maju/mundur 1 menit; PageUp/PageDown pindah media.
+   Kecepatan 0,25–4x. Shortcut tidak mengambil alih penyuntingan kolom/tabel/playlist.
+4. Pemutar kedua membuka jendela independen dan dimulai dalam keadaan mute.
+   PiP menampilkan jendela kecil always-on-top dengan kontrol dan subtitle.
 
-PLAYLIST
-- Panel kanan: + Film, urutkan naik/turun, drag untuk mengubah urutan, hapus pilihan.
-- Klik dua kali nama film untuk memutarnya.
-- Tambah folder tersedia di menu File; pemindaian hanya folder yang dipilih.
-- Film berikutnya otomatis, Acak, Ulang semua/Ulang satu bisa diatur.
-- Simpan/Buka daftar mendukung M3U8, M3U, dan JSON lokal.
-- Playlist masing-masing pemutar disimpan otomatis saat jendela ditutup.
-- Lokasi video dalam playlist harus tetap tersedia; file video tidak disalin ke playlist.
+AUDIO STUDIO
+- Klik Equalizer atau menu Audio. Centang Aktifkan equalizer.
+- Pilih salah satu dari 13 preset: Normal, Film seimbang, Film aksi, Dialog/Vokal,
+  Musik seimbang, Rock, Pop, Jazz, Klasik, Bass, Treble, Headphone, Malam/Lembut.
+- Geser 10 band native VLC dan preamp (-20 sampai +20 dB). Bypass mengembalikan suara asli.
+- Auto-headroom mengurangi preamp saat ada boost. Ini bukan limiter/kompresor.
+- Simpan preset pribadi; impor/ekspor profil JSON. Pengaturan otomatis tersimpan per jendela.
+- Muat track untuk memilih track audio playback, pilih kanal atau sinkron audio +/-5 detik.
+  Pilihan track playback belum mengganti track default yang diproses oleh AI.
 
-DUA FILM BERSAMAAN
-- Klik Pemutar kedua. Dua jendela ditempatkan berdampingan.
-- Buka film lain di jendela kedua. Playlist, posisi, kecepatan dan subtitle masing-masing terpisah.
-- Jendela kedua dimulai dengan mute untuk menghindari suara bertumpuk; klik Mute untuk menyalakan suaranya.
-- Maksimal dua jendela melalui tombol ini. Dua video berat bergantung kemampuan komputer.
-- Permintaan subtitle kedua jendela diserialkan agar tidak membanjiri kuota Gemini.
+CINEMA / SCENE TOOLS
+- Bookmark dan daftar bookmark: simpan/pilih adegan. Klik dua kali untuk menuju adegan.
+- A-B repeat: klik pertama A, kedua B, ketiga menghapus loop.
+- Screenshot menyimpan PNG. Pada 3D menyimpan frame anaglyph; pada mode native memakai snapshot VLC.
+- Posisi menonton tersimpan berkala. Profil film menyimpan suara, warna, renderer, 3D,
+  subtitle dan kecepatan. Profil dapat diterapkan otomatis saat file yang sama dibuka.
+- Poster lokal: letakkan JPG/PNG dengan nama sama seperti media, atau poster.jpg di folder media.
+- Thumbnail muncul saat slider digeser. Info codec menampilkan metadata/statistik dan dukungan FFmpeg.
+- GPU Cinema meminta akselerasi D3D11 pada Windows. Ketersediaan GPU/driver tidak dijamin.
+- Warna video, gamma, ketajaman, font/warna/offset subtitle dan pencarian teks tersedia.
+- Ekspor HD 720p, Full HD 1080p, atau 4K 2160p membuat MP4 baru.
+  CPU memakai Lanczos dan ketajaman; NVIDIA/Intel menyediakan jalur GPU bila tersedia;
+  AMD AMF memakai encoder GPU dengan skala CPU. Padding/transfer memori dapat memakai CPU.
+  Upscale bukan AI super-resolution dan tidak memulihkan detail hilang.
+  Efek 3D dan overlay subtitle tidak dibakar pada file ekspor.
 
-KONTROL
-- Space: Play/Pause; M: Mute.
-- Panah kiri / kanan: mundur / maju 5 detik.
-- Panah atas / bawah: maju / mundur 1 menit.
-- Kecepatan: 0,25 sampai 4 kali melalui kontrol Kecepatan.
-- F atau F11: Fullscreen; Esc: keluar fullscreen/PiP.
-- PageUp / PageDown: film sebelumnya / berikutnya.
-- Panah di kolom teks/tabel/playlist tetap digunakan untuk menyunting atau navigasi daftar; klik area video untuk memakai shortcut film.
-- Mode Windows bawaan Kompatibel (CPU/GDI) mengurangi ketergantungan pada driver GPU. Pilihan Otomatis/GPU dan Direct3D11 tersedia.
-- Log video membuka log lokal untuk diagnosis; dapat memuat lokasi/nama video, bukan API key.
+3D
+- Setelan 3D: aktifkan, pilih merah-cyan atau merah-biru sesuai kacamata.
+- Sumber 2D: pergeseran bidang buatan. Stereo objek asli memerlukan SBS/TB.
+- Pilih half/full sesuai sumber, geser tiap mata minus/plus, atau tukar mata.
+- Render anaglyph memakai CPU, maksimal 960x540; file asli tidak diubah.
 
-PIP DAN 3D
-- PiP: jendela kecil selalu di atas, dapat dipindah dan diubah ukurannya. Subtitle dan play/pause tersedia.
-- Setelan 3D: centang Aktifkan 3D, pilih Merah-cyan atau Merah-biru sesuai kacamata.
-- Atur nilai minus/plus Merah/mata kiri dan Cyan/biru/mata kanan untuk pergeseran kedua mata.
-- Pilih sumber 2D, SBS half/full, atau Top-Bottom half/full sesuai video. Tukar mata tersedia.
-- Video 2D hanya diberi pergeseran bidang buatan. Kedalaman objek stereo asli memerlukan sumber 3D SBS/TB.
-- Mode 3D memakai CPU, membatasi hasil pratinjau ke maksimal 960x540, dan dapat lebih berat dari pemutaran biasa.
-- Efek 3D hanya untuk tampilan; tidak mengubah file video asli.
+SUBTITLE GEMINI / AI LOKAL
+1. Klik Subtitle / AI. Default Gemini online, target Indonesia, sumber bahasa auto-detect.
+2. Masukkan key Gemini Free Tier tanpa billing, lalu Simpan API key di Windows.
+   Key lama LinguaPlayer masih dapat dibaca. Key tidak ditanam dalam EXE/proyek/cache.
+3. Isi kamus nama/istilah bila perlu, lalu Buat/Lanjutkan subtitle.
+4. Potongan 10 detik memakai konteks overlap 1 detik. Pemutaran menunggu buffer bila API lambat.
+5. Hasil parsial disimpan atomik ke cache lokal, dapat dilanjutkan setelah restart dengan file
+   dan konfigurasi yang sama. Hasil lengkap dipakai ulang tanpa panggilan API.
+6. Edit teks/timing, cari kalimat, simpan proyek JSON atau ekspor SRT untuk offline.
+   SRT dengan nama sama di folder media dapat dimuat otomatis.
+7. Hapus cache konfigurasi saat ini untuk memproses ulang. Batal pada permintaan aktif
+   menunggu timeout (maksimal 180 detik per permintaan); error sementara dicoba maksimal dua kali.
+8. AI lokal memerlukan server Whisper.cpp dan Ollama/model terpasang terpisah.
+   Baca AI_LOKAL_ID.md. Aplikasi tidak mengunduh bobot model secara otomatis.
 
-SUBTITLE OTOMATIS
-1. Klik Subtitle / AI pada toolbar.
-2. Isi Gemini API key. Simpan API key di Windows agar otomatis terisi pada akun Windows yang sama.
-3. Model bawaan gemini-3.5-flash-lite. Nama model dapat disesuaikan dengan model yang tersedia pada akun.
-4. Bahasa asal dideteksi dari suara; target bawaan Indonesia. Pilih/ketik bahasa lain bila perlu.
-5. Isi kamus ejaan untuk nama/istilah khusus, lalu klik Buat / Lanjutkan subtitle.
-6. Audio dikirim ke Google setelah konfirmasi. Audio per 10 detik diproses bertahap.
-7. Setelah buffer siap video diputar; jika API lambat video dijeda untuk menjaga urutan subtitle.
-8. Jika timeout/koneksi putus: hasil yang sudah selesai dipertahankan, tekan Buat / Lanjutkan subtitle pada sesi yang sama. Bagian sukses tidak dikirim ulang.
-9. Batas tunggu per permintaan 180 detik, maksimal dua percobaan untuk error sementara. Batal menunggu permintaan aktif berakhir.
-10. Tinjau teks/timing; Ekspor SRT untuk offline. Buka video lalu Buka SRT offline, atau gunakan SRT dengan nama sama di folder video untuk dimuat otomatis.
-11. Simpan proyek JSON untuk mempertahankan teks kedua bahasa dan timing. Key tidak masuk proyek.
-
-GRATIS DAN BATASAN
-- Gunakan proyek Gemini Free Tier tanpa billing. Aplikasi tidak dapat memverifikasi billing proyek hanya dari API key.
-- Model Lite memiliki opsi Free Tier untuk akun yang memenuhi syarat; ketersediaan/kuota tetap ditentukan Google.
-- Google Translate tidak dipanggil dalam UI versi ini, dan tidak ada fallback otomatis ke model/layanan berbayar.
-- Saat akses/kuota harian ditolak, proses berhenti dengan detail error. Jangan upgrade untuk melanjutkan secara gratis; tunggu kuota tersedia atau pilih model yang diizinkan akun.
-- Permintaan kedua jendela diserialkan dan diberi interval minimum 15 detik. Batas akun yang lebih rendah tetap bisa menghasilkan 429.
-- Timeout dari server/jaringan tidak dapat dihilangkan sepenuhnya. Akurasi dan sinkronisasi 100% tidak dijamin.
-- Belum mendukung URL YouTube, live microphone atau forced alignment; pemutar menggunakan file video lokal.
-- Format yang dapat diputar mengikuti VLC. File rusak, DRM dan codec khusus tetap mungkin gagal.
-- EXE belum memiliki code signing penerbit. Jangan memindahkan EXE sendirian dari folder _internal.
+BATASAN DAN PENGUJIAN
+- Runtime VLC/FFmpeg, plugin dan library dibundel. Tidak perlu memasang Python/VLC terpisah.
+- Tidak ada fallback otomatis ke layanan berbayar. Status billing tidak dapat diverifikasi dari key.
+- Free Tier, kuota, dukungan model, jaringan dan kualitas subtitle tetap bergantung layanan.
+- Codec aktual mengikuti VLC; DRM, file korup atau codec khusus dapat gagal.
+- HDR native bergantung VLC, Windows, monitor dan driver; belum dikalibrasi aplikasi.
+- GPU fisik tidak diverifikasi pada mesin CI. Periksa Info codec dan log jika ada masalah.
+- Log video dapat memuat nama/lokasi file. Cache subtitle disimpan sebagai teks lokal tanpa enkripsi.
+- EXE belum bertanda tangan digital. Installer/update otomatis belum tersedia.
+- Baca AUDIT_CYBER80_PLAYERS_ID.md dan HASIL_UJI_WINDOWS.json untuk cakupan/hasil uji.

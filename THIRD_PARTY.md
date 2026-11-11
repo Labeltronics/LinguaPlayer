@@ -1,6 +1,6 @@
 # Tools dan lisensi
 
-Kode aplikasi asli LinguaPlayer: MIT, lihat LICENSE.
+Kode aplikasi asli Cyber80 Players: MIT, lihat LICENSE.
 Dependency tidak disertakan dalam ZIP sumber ini. Build mengunduh dependency melalui pip dan menyalin VLC yang terpasang.
 
 - VLC / libVLC: https://www.videolan.org/vlc/ dan https://code.videolan.org/videolan/vlc — komponen VLC umumnya GPL/LGPL; lihat COPYING dan lisensi setiap plugin pada distribusi yang dibundel.
@@ -10,3 +10,6 @@ Dependency tidak disertakan dalam ZIP sumber ini. Build mengunduh dependency mel
 - PyInstaller: https://github.com/pyinstaller/pyinstaller — GPL dengan pengecualian untuk bundling aplikasi.
 
 Sebelum distribusi publik, pertahankan seluruh file lisensi dependency dan sediakan source/penawaran source yang diwajibkan oleh lisensi build VLC/FFmpeg/Qt yang dipilih. ZIP ini bukan sertifikasi kepatuhan lisensi atau paket codec universal.
+
+- NumPy: https://github.com/numpy/numpy — BSD-3-Clause dan lisensi komponen bawaan; lisensi di metadata distribusi yang dibundel.
+- Adapter layanan lokal mengikuti API Whisper.cpp (https://github.com/ggml-org/whisper.cpp) dan Ollama (https://github.com/ollama/ollama); server/model tidak dibundel dan mempunyai lisensi masing-masing.

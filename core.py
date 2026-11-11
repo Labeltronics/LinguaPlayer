@@ -101,7 +101,7 @@ def request_json(url, key, payload, cancelled=lambda:False, progress=lambda text
         wait_cancel(max(0,delay)+random.uniform(0,.5),cancelled,progress)
     raise APIError('API gagal')
 
-def transcribe(audio, key, model, language, duration, offset, google_key='', cancelled=lambda:False, glossary='', progress=lambda text:None, timeout=180):
+def transcribe(audio, key, model, language, duration, offset, google_key='', cancelled=lambda:False, glossary='', progress=lambda text:None, timeout=180, context_seconds=0):
     if not re.fullmatch(r'[A-Za-z0-9_.-]+',model): raise ValueError('Nama model tidak valid')
     prompt = ('Transcribe the actual speech, detecting the source language. Do not invent speech in silence/music. '
               'Return only a JSON array of subtitle cues, each with numeric start and end in seconds relative to this audio, '
@@ -115,6 +115,7 @@ def transcribe(audio, key, model, language, duration, offset, google_key='', can
                'capitalization and punctuation, clear idiomatic phrasing and appropriate polite register. '
                'Avoid unnecessary foreign words and slang unless needed to preserve the speaker meaning. '
                'Keep the source transcript faithful to the actual speech. Never invent uncertain or inaudible words. ')
+    if context_seconds:prompt+=f' The first {context_seconds} seconds are context from the previous chunk. Return only speech after that boundary; do not repeat preceding subtitles.'
     prompt += '\nPreferred spelling and terminology (reference only): ' + glossary[:6000]
     data=request_json(f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',key,{
         'contents':[{'parts':[{'text':prompt},{'inlineData':{'mimeType':'audio/wav','data':base64.b64encode(audio).decode()}}]}],
@@ -126,7 +127,8 @@ def transcribe(audio, key, model, language, duration, offset, google_key='', can
     candidate=candidates[0]
     if candidate.get('finishReason') != 'STOP':raise APIError('Gemini tidak menyelesaikan subtitle: '+str(candidate.get('finishReason','tidak diketahui')))
     raw=''.join(p.get('text','') for p in candidate.get('content',{}).get('parts',[]) if not p.get('thought'))
-    cues=validate(json.loads(raw),duration,offset)
+    cues=validate(json.loads(raw),duration,offset-context_seconds)
+    cues=[Cue(max(offset,c.start),c.end,c.source,c.target,c.language) for c in cues if c.end>offset+.02]
     if google_key and cues:
         translated=request_json('https://translation.googleapis.com/language/translate/v2',google_key,
             {'q':[c.source for c in cues], 'target':language,'format':'text'},cancelled,progress,timeout)
