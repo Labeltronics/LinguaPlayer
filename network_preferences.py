@@ -45,3 +45,9 @@ def initialize(persist=False):
         except Exception:pass
     apply_qt()
 def save_private_configuration():save_key('BrowserProxy',json.dumps(current()))
+
+
+def proxy_credentials(host):
+    value=current()
+    if value['mode']=='http' and str(host).strip('[]').lower()==value['host'].strip('[]').lower():return value['username'],value['password']
+    return None

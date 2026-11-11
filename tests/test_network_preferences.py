@@ -1,5 +1,5 @@
 import unittest,urllib.parse,urllib.request
-from network_preferences import google_search_url,google_safe_url,configure,urllib_proxy_handler
+from network_preferences import google_search_url,google_safe_url,configure,urllib_proxy_handler,proxy_credentials
 from web_transfer import GuardedRedirect
 class NetworkPreferenceTests(unittest.TestCase):
     def tearDown(self):configure('system')
@@ -11,7 +11,7 @@ class NetworkPreferenceTests(unittest.TestCase):
         url='https://www.google.com/search?q=x&safe=active';self.assertEqual(google_safe_url(url,False),url)
     def test_proxy_modes_and_validation(self):
         configure('direct');self.assertEqual(urllib_proxy_handler().proxies,{})
-        configure('http','127.0.0.1',8080,'fixture user','fixture:password');proxy=urllib_proxy_handler().proxies;self.assertEqual(set(proxy),{'http','https'});self.assertIn('fixture%20user:fixture%3Apassword@127.0.0.1:8080',proxy['https'])
+        configure('http','127.0.0.1',8080,'fixture user','fixture:password');proxy=urllib_proxy_handler().proxies;self.assertEqual(set(proxy),{'http','https'});self.assertIn('fixture%20user:fixture%3Apassword@127.0.0.1:8080',proxy['https']);self.assertEqual(proxy_credentials('127.0.0.1'),('fixture user','fixture:password'));self.assertIsNone(proxy_credentials('unrelated.example'))
         for host in ('http://proxy','bad\nproxy','user@proxy',''):
             with self.assertRaises(ValueError):configure('http',host)
     def test_https_downgrade_is_rejected(self):

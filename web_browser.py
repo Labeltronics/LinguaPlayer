@@ -94,10 +94,14 @@ class BrowserWindow(QDialog):
     def add_tab(self,url):
         view=WebView(self);page=WebPage(self.profile,view);view.setPage(page);view.settings().setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled,True)
         view.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls,False);view.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls,False)
-        page.fullScreenRequested.connect(self.fullscreen_request);page.renderProcessTerminated.connect(lambda *args:self.status.setText('Proses tab berhenti. Muat ulang tab; pemutar utama tetap terpisah.'))
+        page.fullScreenRequested.connect(self.fullscreen_request);page.proxyAuthenticationRequired.connect(self.proxy_authentication);page.renderProcessTerminated.connect(lambda *args:self.status.setText('Proses tab berhenti. Muat ulang tab; pemutar utama tetap terpisah.'))
         if hasattr(page,'permissionRequested'):page.permissionRequested.connect(lambda permission:permission.deny())
         view.titleChanged.connect(lambda title,v=view:self.tabs.setTabText(self.tabs.indexOf(v),title[:50] or 'Tab'));view.urlChanged.connect(lambda value,v=view:self.url_changed(v,value));view.loadFinished.connect(lambda ok:self.scan() if ok else self.status.setText('Halaman gagal dimuat; periksa URL, internet, atau kebijakan situs.'))
         self.tabs.addTab(view,'Tab');self.tabs.setCurrentWidget(view);view.setUrl(QUrl(url));return view
+    def proxy_authentication(self,url,authenticator,host):
+        from network_preferences import proxy_credentials
+        credentials=proxy_credentials(host)
+        if credentials is not None:authenticator.setUser(credentials[0]);authenticator.setPassword(credentials[1])
     def fullscreen_request(self,request):
         request.accept()
         if request.toggleOn():self.showFullScreen()

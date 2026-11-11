@@ -104,7 +104,8 @@ class ManifestTests(unittest.TestCase):
             root=Path(d);source=root/'source.mp4'
             subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','testsrc2=size=160x120:rate=10:duration=2','-f','lavfi','-i','sine=frequency=440:duration=2','-c:v','libx264','-g','10','-c:a','aac','-shortest',str(source)],check=True,**flags)
             subprocess.run([ff,'-v','error','-y','-i',str(source),'-c','copy','-hls_time','1','-hls_playlist_type','vod','-hls_segment_filename',str(root/'hls%02d.ts'),str(root/'test.m3u8')],check=True,**flags)
-            subprocess.run([ff,'-v','error','-y','-i',str(source),'-c','copy','-f','dash','-seg_duration','1',str(root/'test.mpd')],check=True,**flags)
+            subprocess.run([ff,'-v','error','-y','-i',str(source),'-c','copy','-f','dash','-seg_duration','1','test.mpd'],check=True,cwd=str(root),**flags)
+            self.assertTrue((root/'init-stream0.m4s').is_file(),'DASH fixture initialization segment missing')
             server=Server(root)
             try:
                 for kind,manifest in [('hls','test.m3u8'),('dash','test.mpd')]:

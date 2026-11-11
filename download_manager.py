@@ -153,7 +153,8 @@ class DownloadManager(QDialog):
             browser=browsers[labels.index(choice)];self.providers[r['id']]=browser.headers_for;self.status.setText('Sesi profil dihubungkan. Tekan Lanjutkan; token Authorization yang tidak tersedia perlu dideteksi ulang dari halaman.')
     def checksum(self):
         r=self.record()
-        if not r or r['id'] in self.jobs:return
+        if not r:return
+        if r['id'] in self.jobs:self.status.setText('Jeda tugas dan tunggu berhenti sebelum mengatur checksum SHA256.');return
         value,ok=QInputDialog.getText(self,'SHA256','Checksum SHA256 yang diharapkan (kosong = tidak memeriksa):')
         if ok:
             import re
