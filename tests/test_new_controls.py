@@ -22,6 +22,8 @@ class ControlsTests(unittest.TestCase):
             with patch('advanced_addons.QInputDialog.getInt',return_value=(17,True)):w.set_wheel_seconds()
             w.player.set_time.reset_mock();w.handle_video_wheel(60);w.player.set_time.assert_not_called();w.handle_video_wheel(60);w.player.set_time.assert_called_with(27000)
             self.assertEqual((w.zoom_box.minimum(),w.zoom_box.maximum()),(.1,1000))
+            from core import Cue
+            w.fill([Cue(0,1,'Hello','Halo','en')]);self.assertIn('en',w.detected.text());w.fill([]);self.assertIn('belum dianalisis',w.detected.text());w.fill([Cue(0,1,'Subtitle offline')]);self.assertIn('tidak tersedia',w.detected.text())
         finally:w.close()
     @patch.object(app.vlc,'Instance',side_effect=fake_engine)
     def test_zoom_canvas_and_reset_are_reversible(self,factory):
@@ -35,6 +37,36 @@ class ControlsTests(unittest.TestCase):
         self.assertEqual(trim_range(1,2,3),(1,2))
         for values in ((2,1,3),(-1,2,3),(0,4,3),(0,float('nan'),3)):
             with self.assertRaises(ValueError):trim_range(*values)
+    @patch.object(app.vlc,'Instance',side_effect=fake_engine)
+    def test_resume_uses_current_cookies_not_deleted_snapshot(self,factory):
+        w=app.Window();manager=w.get_download_manager()
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                record=manager.add('https://example.test/media.mp4','media.mp4',headers={'Cookie':'expired=session','Authorization':'fixture'},target=Path(d)/'media.mp4')
+                manager.providers[record['id']]=lambda url:{'User-Agent':'fixture'}
+                with patch('download_manager.DownloadJob') as job:
+                    manager.start(record);headers=job.call_args.args[2];self.assertNotIn('Cookie',headers);self.assertEqual(headers['Authorization'],'fixture')
+                manager.jobs.clear()
+        finally:manager.jobs.clear();w.close();q.processEvents()
+    @patch.object(app.vlc,'Instance',side_effect=fake_engine)
+    def test_snapshot_fallback_and_source_protection(self,factory):
+        import subprocess,time,imageio_ffmpeg
+        w=app.Window()
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                source=Path(d)/'source.mp4';target=Path(d)/'frame.png';flags={'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}
+                subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(),'-v','error','-y','-f','lavfi','-i','color=blue:size=160x120:duration=1','-c:v','libx264',str(source)],check=True,**flags)
+                w.path=str(source);w.player.get_time.return_value=0;w.player.video_take_snapshot.return_value=-1
+                with self.assertRaises(ValueError):w.capture_frame(source)
+                w.capture_frame(target);deadline=time.monotonic()+10
+                while w.snapshot_job is not None and time.monotonic()<deadline:q.processEvents();time.sleep(.01)
+                self.assertTrue(target.is_file());self.assertTrue(source.is_file())
+                target2=Path(d)/'frame2.png';w.player.video_take_snapshot.return_value=0;w.capture_frame(target2);deadline=time.monotonic()+10
+                while (not target2.is_file() or w.snapshot_job is not None) and time.monotonic()<deadline:q.processEvents();time.sleep(.01)
+                self.assertTrue(target2.is_file())
+        finally:
+            if w.snapshot_job:w.snapshot_job.cancel();w.snapshot_job.wait(2000);q.processEvents()
+            w.close();q.processEvents()
 class StereoTVTests(unittest.TestCase):
     def test_depth_varies_by_object_not_global_shift(self):
         image=np.zeros((32,64,4),np.uint8);image[:,:,0]=np.arange(64);image[:,:,1]=np.arange(64);image[:,:,2]=np.arange(64);image[:,:,3]=255

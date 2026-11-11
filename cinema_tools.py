@@ -31,12 +31,36 @@ def stamp(ms):
 
 from modern_tools import ModernTools
 
+class SnapshotJob(QThread):
+    ready=Signal(str);failure=Signal(str)
+    def __init__(self,source,target,seconds):super().__init__();self.source=str(source);self.target=str(target);self.seconds=seconds;self.proc=None
+    def cancel(self):
+        self.requestInterruption()
+        if self.proc:
+            try:self.proc.kill()
+            except OSError:pass
+    def run(self):
+        import uuid
+        target=Path(self.target);temp=target.with_name(target.stem+'.'+uuid.uuid4().hex+'.partial.png')
+        try:
+            if Path(self.source).resolve()==target.resolve():raise ValueError('Screenshot tidak boleh menimpa media sumber.')
+            if self.isInterruptionRequested():raise InterruptedError('Capture dibatalkan')
+            flags={'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}
+            self.proc=subprocess.Popen([imageio_ffmpeg.get_ffmpeg_exe(),'-v','error','-y','-ss',str(max(0,self.seconds)),'-i',self.source,'-frames:v','1','-c:v','png','-f','image2',str(temp)],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,**flags)
+            try:_,error=self.proc.communicate(timeout=15)
+            except subprocess.TimeoutExpired:self.proc.kill();self.proc.communicate();raise RuntimeError('Capture frame timeout.')
+            if self.isInterruptionRequested():raise InterruptedError('Capture dibatalkan')
+            if self.proc.returncode or not temp.is_file() or not temp.stat().st_size:raise RuntimeError('Frame belum dapat diambil. Coba posisi video lain.')
+            os.replace(temp,target);self.ready.emit(str(target))
+        except Exception as exc:temp.unlink(missing_ok=True);self.failure.emit(str(exc))
+        finally:self.proc=None
+
 class CinemaTools(ModernTools):
     def setup_cinema_tools(self,action):
         self.storage_enabled='--self-test' not in sys.argv and os.getenv('QT_QPA_PLATFORM')!='offscreen'
         self.media_store=MediaStore.shared(self.log_path.parent/'media-library.json',self.storage_enabled)
         self.subtitle_cache=SubtitleCache(self.log_path.parent/'subtitle-cache');self.cache_context=None
-        self.last_position_save=0.;self.ab_a=None;self.ab_b=None;self.export_job=None;self.thumbnail_job=None
+        self.last_position_save=0.;self.ab_a=None;self.ab_b=None;self.export_job=None;self.thumbnail_job=None;self.snapshot_job=None
         self.search_box=QLineEdit();self.search_box.setPlaceholderText('Cari koleksi / nama media …');self.search_box.textChanged.connect(self.filter_library)
         self.playlist_dock.widget().layout().insertWidget(0,self.search_box)
         self.sound_dock=QDockWidget('Audio Studio — Equalizer & preset',self);self.sound_dock.setObjectName('audio')
@@ -151,9 +175,31 @@ class CinemaTools(ModernTools):
             self.ab_b=position;self.status.setText('Loop A–B aktif. Tekan A–B untuk menghapus loop.')
         else:self.ab_a=None;self.ab_b=None;self.status.setText('Loop A–B dimatikan.')
     def capture_frame(self,path):
+        if self.path and Path(path).resolve()==Path(self.path).resolve():raise ValueError('Screenshot tidak boleh menimpa media sumber.')
+        if self.video.audio_title:
+            if not self.video.grab().save(str(path)):raise RuntimeError('Capture audio tidak dapat disimpan.')
+            return
         if (self.stereo_on or self.canvas_active()) and self.video.image is not None:
-            if not self.video.image.save(path):raise RuntimeError('Gambar tidak dapat disimpan.')
-        elif self.player.video_take_snapshot(0,str(path),0,0)==-1:raise RuntimeError('Snapshot video tidak tersedia.')
+            if not self.video.image.save(str(path)):raise RuntimeError('Gambar tidak dapat disimpan.')
+        else:
+            source=self.path;seconds=max(0,self.player.get_time())/1000
+            def stamp_file():
+                try:value=Path(path).stat();return (value.st_size,value.st_mtime_ns)
+                except OSError:return None
+            original=stamp_file()
+            if self.player.video_take_snapshot(0,str(path),0,0)==-1:self.snapshot_fallback(source,path,seconds)
+            else:
+                def verify():
+                    if self.closing:return
+                    current=stamp_file()
+                    if current is None or not current[0] or current==original:self.snapshot_fallback(source,path,seconds)
+                QTimer.singleShot(800,verify)
+    def snapshot_fallback(self,source,path,seconds):
+        if self.closing:return
+        if self.snapshot_job is not None:
+            QTimer.singleShot(100,lambda:self.snapshot_fallback(source,path,seconds));return
+        self.snapshot_job=SnapshotJob(source,path,seconds);self.snapshot_job.ready.connect(lambda p:self.status.setText('Screenshot tersimpan: '+p));self.snapshot_job.failure.connect(self.status.setText);self.snapshot_job.finished.connect(self.snapshot_finished);self.snapshot_job.start()
+    def snapshot_finished(self):self.snapshot_job.deleteLater();self.snapshot_job=None
     def capture_dialog(self):
         if not self.path:return
         path,_=QFileDialog.getSaveFileName(self,'Simpan screenshot',f'Cyber80_{Path(self.path).stem}_{stamp(self.player.get_time()).replace(":","-")}.png','PNG (*.png)')

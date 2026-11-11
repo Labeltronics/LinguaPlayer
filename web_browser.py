@@ -165,7 +165,10 @@ class BrowserWindow(QDialog):
             if ok:self.current().setUrl(QUrl(value))
     def clear_data(self):
         if QMessageBox.question(self,'Hapus data browser','Hapus cookie, cache dan riwayat browser ini? Bookmark dipertahankan.')==QMessageBox.Yes:
-            self.profile.cookieStore().deleteAllCookies();self.profile.clearHttpCache();self.history=[];self.cookies={};self.clear_media();self.save();self.status.setText('Penghapusan cookie/cache diminta. Halaman aktif mungkin perlu dimuat ulang.')
+            self.profile.cookieStore().deleteAllCookies();self.profile.clearHttpCache();self.profile.clearAllVisitedLinks()
+            for rid,provider in self.manager.providers.items():
+                if getattr(provider,'__self__',None) is self:self.manager.headers[rid]={}
+            self.history=[];self.cookies={};self.clear_media();self.save();self.status.setText('Penghapusan cookie/cache diminta. Halaman aktif mungkin perlu dimuat ulang.')
     def cookie_key(self,cookie):return (bytes(cookie.name()),cookie.domain(),cookie.path())
     def cookie_added(self,cookie):self.cookies[self.cookie_key(cookie)]=cookie
     def cookie_removed(self,cookie):self.cookies.pop(self.cookie_key(cookie),None)

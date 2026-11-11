@@ -152,6 +152,7 @@ class AdvancedAddons:
         t=max(0,self.player.get_time())/1000;active=[c for c in self.cues_4d if c['start']<=t<c['start']+c['duration']]
         self.cue_4d_label.setText('4D preview: '+', '.join(f'{c["effect"]} {c["intensity"]}%' for c in active) if active else '4D: tidak ada cue aktif (preview saja)')
     def addons_can_close(self):
+        if self.snapshot_job is not None and self.snapshot_job.isRunning():self.snapshot_job.cancel();self.status.setText('Menunggu capture frame selesai.');return False
         if self.download_manager and self.download_manager.active():self.status.setText('Jeda/batalkan unduhan dan tunggu koneksi berhenti sebelum menutup. Browser boleh disembunyikan.');return False
         if self.cut_editor and self.cut_editor.job is not None:self.cut_editor.cancel_export();self.status.setText('Menunggu pembatalan cutting selesai.');return False
         if self.tv_export is not None:self.cancel_tv_export();self.status.setText('Menunggu ekspor 3D berhenti.');return False

@@ -79,7 +79,9 @@ class DownloadManager(QDialog):
         if not url:record['status']='Needs URL';record['message']='Isi URL baru; sesi login tidak disimpan di antrean.';self.refresh();return
         headers=self.headers.get(rid,{})
         provider=self.providers.get(rid)
-        if provider:headers={**headers,**provider(url)}
+        if provider:
+            headers={k:v for k,v in headers.items() if k.lower()!='cookie'}
+            headers.update(provider(url))
         job=DownloadJob(record,url,headers,self.limiter);self.jobs[rid]=job;record['status']='Running'
         job.update.connect(lambda data,r=record:self.update_record(r,data));job.done.connect(lambda state,message,r=record:self.result(r,state,message));job.finished.connect(lambda i=rid:self.release(i));job.start();self.refresh()
     def update_record(self,record,data):record.update(data);self.refresh()

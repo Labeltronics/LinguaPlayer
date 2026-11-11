@@ -317,6 +317,8 @@ class Window(PlayerExtras,QMainWindow):
         if self.want_play:self.player.play()
         self.fill(cues);self.save_ai_checkpoint({'cues':cues,'coverage':self.coverage,'next_offset':self.job.resume_from if self.job else 0,'complete':True});self.status.setText(f'{len(cues)} subtitle selesai. Koreksi teks/timing pada tabel; klik dua kali untuk menuju adegan.')
     def fill(self,cues):
+        languages=sorted({c.language for c in cues if c.language})
+        self.detected.setText(('Bahasa sumber terdeteksi (perkiraan): '+', '.join(languages)+' → '+self.lang.currentText()) if languages else ('Subtitle dimuat; metadata bahasa sumber tidak tersedia.' if cues else 'Bahasa sumber: belum dianalisis → '+self.lang.currentText()))
         self.cues=cues;self.table.blockSignals(True);self.table.setRowCount(len(cues))
         for i,c in enumerate(cues):
             for j,v in enumerate((c.start,c.end,c.source,c.target)):self.table.setItem(i,j,QTableWidgetItem(str(v)))
