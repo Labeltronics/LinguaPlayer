@@ -169,8 +169,9 @@ class Window(PlayerExtras,QMainWindow):
         if rotation!='off':filters.append('transform');options+=['--transform-type='+rotation]
         if filters:options+=['--video-filter='+':'.join(filters)]
         dsp=getattr(self,'audio_dsp','off')
-        from audio_gain import dsp_options
-        panel=getattr(self,'audio_panel',None);options+=dsp_options(dsp,panel.boost.value() if panel else 0,panel.peak_guard.isChecked() if panel else True)
+        from audio_gain import native_audio_options,audio_signature
+        panel=getattr(self,'audio_panel',None);audio_state=panel.state() if panel else {'enabled':False,'preamp':0,'bands':[0.]*10,'headroom':False,'boost':0,'peak_guard':True}
+        options+=native_audio_options(audio_state,dsp);self.engine_audio_signature=audio_signature(audio_state,dsp)
         engine=vlc.Instance(*options)
         if engine is None:raise RuntimeError('VLC tidak dapat memuat plugin codec yang dibundel.')
         return engine

@@ -39,9 +39,9 @@ class AudioUITests(unittest.TestCase):
         w=app.Window()
         try:
             w.audio_panel.preset.setCurrentText('Dialog / Vokal');w.audio_panel.apply();old=w.player
-            self.assertTrue(w.audio_panel.enabled.isChecked());old.set_equalizer.assert_called()
+            self.assertTrue(w.audio_panel.enabled.isChecked());self.assertTrue(any(str(v).startswith('--equalizer-preamp=') for v in engine.call_args.args))
             self.assertEqual(w.audio_panel.native.set_amp_at_index.call_count,10)
-            w.change_renderer(1);self.assertIsNot(old,w.player);w.player.set_equalizer.assert_called()
+            w.change_renderer(1);self.assertIsNot(old,w.player);self.assertTrue(any('equalizer' in str(v) for v in engine.call_args.args))
             self.assertEqual(w.audio_panel.state()['bands'],[float(v) for v in PRESETS['Dialog / Vokal']])
         finally:w.close()
     @patch.object(app.vlc,'Instance',side_effect=fake_engine)

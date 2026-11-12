@@ -8,3 +8,9 @@ class GainTests(unittest.TestCase):
     def test_compressor_not_lost_when_normalizer_is_selected(self):
         values=dsp_options('normalize',12,True);self.assertIn('--audio-filter=normvol:compressor',values);self.assertIn('--compressor-ratio=20',values)
         self.assertEqual(dsp_options('off',0,True),[]);self.assertIn('--audio-filter=compressor',dsp_options('night',0,False))
+
+    def test_native_chain_keeps_eq_and_compressor_and_explicit_bypass(self):
+        from audio_gain import native_audio_options
+        state={'enabled':True,'preamp':0,'bands':[0]*10,'headroom':True,'boost':12,'peak_guard':True}
+        values=native_audio_options(state);self.assertIn('--audio-filter=equalizer:compressor',values);self.assertIn('--equalizer-preamp=12',values)
+        self.assertEqual(native_audio_options({'enabled':False,'boost':0}),['--audio-filter='])

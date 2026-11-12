@@ -13,3 +13,5 @@ Pengujian EXE memeriksa gain native VLC, volume 200%, decoding file sintetis pel
 ### Volume benar-benar diterapkan
 
 Player mengulang pengaturan volume/mute selama output audio baru belum siap, setelah membuka media atau mengganti renderer. Pengulangan berhenti ketika VLC menerima pengaturan, agar tidak terus-menerus memaksa perubahan mixer. Beberapa backend audio tidak menyediakan readback volume yang akurat; sampel PCM dipakai pada pengujian untuk memastikan gain aktual. Mode Normal mem-bypass EQ dan DSP. Uji EXE menggunakan output PCM memori libVLC untuk membandingkan level RMS Normal dengan dekode sumber, memeriksa kenaikan RMS saat boost, lalu memastikan Reset kembali ke level sumber. Ini pengukuran software, bukan pengukuran speaker fisik.
+
+EQ dan dinamika kini dimuat bersama sebagai satu rangkaian filter saat output dibuat. Ini menghindari API equalizer yang menggantikan rangkaian efek. Perubahan gain/band/dinamika dapat membuat ulang output sebentar; posisi dan pause/mute dipertahankan. Mode normal mengirim konfigurasi filter kosong secara eksplisit.

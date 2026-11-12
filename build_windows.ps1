@@ -19,6 +19,8 @@ if ($DnsPlanObject.writes_dns -or $DnsPlanObject.servers[0] -ne '1.1.1.1') { thr
 if ($LASTEXITCODE -ne 0) { throw 'Pembuatan ikon gagal.' }
 & $Python -m unittest discover -s tests -v
 if ($LASTEXITCODE -ne 0) { throw 'Tes gagal.' }
+& $Python verify_audio_source.py
+if ($LASTEXITCODE -ne 0) { throw 'Verifikasi level audio native gagal.' }
 $VlcDirectory = Join-Path $env:ProgramFiles 'VideoLAN\VLC'
 if ($env:LINGUAPLAYER_VLC_DIR) { $VlcDirectory = $env:LINGUAPLAYER_VLC_DIR }
 if (-not (Test-Path (Join-Path $VlcDirectory 'libvlc.dll'))) { throw 'Pasang VLC Windows 64-bit resmi dahulu, atau set LINGUAPLAYER_VLC_DIR.' }

@@ -27,7 +27,7 @@ def run_audio_boost_checks(window,root):
     root=Path(root);source=root/'quiet-source.mp4';ff=imageio_ffmpeg.get_ffmpeg_exe();report={};measurements={};capture=PCMProbe();phase='initialization'
     subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','color=c=blue:s=160x120:r=10:d=12','-f','lavfi','-i','sine=frequency=440:duration=12','-af','volume=0.05','-ac','2','-c:v','libx264','-c:a','aac','-shortest',str(source)],check=True,**flags())
     reference=subprocess.run([ff,'-v','error','-ss','0.3','-i',str(source),'-map','0:a:0','-t','0.5','-f','s16le','-ac','2','-ar','44100','pipe:1'],stdout=subprocess.PIPE,check=True,**flags()).stdout;values=array.array('h',reference);reference_rms=math.sqrt(sum(float(v)*v for v in values)/len(values))
-    window._selftest_audio_probe=capture
+    window._selftest_audio_probe=capture;window.change_renderer(window.renderer.currentIndex())
     def ready():return window.pending_seek is None and not getattr(window,'audio_sync_deadline',0) and picture_stats(window)['audio_decoded']>0
     def measure():
         capture.reset();wait_for(lambda:capture.read()[0]>=44100,timeout=15);return capture.read()[1]

@@ -2,7 +2,7 @@
 import json,math,os,sys
 from pathlib import Path
 import vlc
-from audio_gain import boost_value,boosted_preamp
+from audio_gain import boost_value,boosted_preamp,audio_signature
 from PySide6.QtCore import Qt,QTimer
 from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QCheckBox,QComboBox,QSlider,
     QPushButton,QDoubleSpinBox,QSpinBox,QInputDialog,QFileDialog,QMessageBox)
@@ -45,7 +45,7 @@ def write_json_atomic(path,data):
 
 class AudioPanel(QWidget):
     def __init__(self,owner):
-        super().__init__();self.owner=owner;self.native=None;self._loading=True;self._limiter_active=False;self.custom={};self.native_presets={}
+        super().__init__();self.owner=owner;self.native=None;self._loading=True;self.custom={};self.native_presets={}
         self.settings_path=owner.log_path.parent/f'audio-{owner.window_number}.json'
         self.persist='--self-test' not in sys.argv and os.getenv('QT_QPA_PLATFORM')!='offscreen'
         box=QVBoxLayout(self);row=QHBoxLayout();box.addLayout(row)
@@ -90,7 +90,7 @@ class AudioPanel(QWidget):
         self.track.currentIndexChanged.connect(self.choose_track)
         self.rebuild_presets();self.load();self._loading=False;self.changed()
     def boost_preset(self,value):
-        self.owner.audio_dsp='off';self._limiter_active=None
+        self.owner.audio_dsp='off'
         self.set_state({'enabled':value>0,'preamp':0,'bands':[0.]*10,'headroom':value>0,'boost':value,'peak_guard':True})
         self.preset.blockSignals(True);self.preset.setCurrentText('Normal / Flat' if value==0 else 'Manual');self.preset.blockSignals(False)
         self.owner.volume.setValue(200 if value>=20 else 100 if value==0 else max(100,self.owner.volume.value()));self.apply()
@@ -121,9 +121,9 @@ class AudioPanel(QWidget):
         self.timer.start(80)
     def apply(self):
         if self._loading or self.owner.closing:return
-        state=self.state();guard=state['boost']>0 and state['peak_guard']
-        if guard!=self._limiter_active:
-            self._limiter_active=guard;self.owner.change_renderer(self.owner.renderer.currentIndex());return
+        state=self.state();signature=audio_signature(state,getattr(self.owner,'audio_dsp','off'))
+        if signature!=getattr(self.owner,'engine_audio_signature',None):
+            self.owner.change_renderer(self.owner.renderer.currentIndex());return
         player=self.owner.player;new=None
         try:
             if state['enabled'] or state['boost']:
@@ -132,7 +132,8 @@ class AudioPanel(QWidget):
                 if new.set_preamp(boosted_preamp(state['preamp'] if state['enabled'] else 0,state['bands'] if state['enabled'] else [0]*10,state['headroom'] if state['enabled'] else False,state['boost']))==-1:raise RuntimeError('Preamp tidak didukung.')
                 for i,gain in enumerate(state['bands'] if state['enabled'] else [0]*10):
                     if new.set_amp_at_index(gain,i)==-1:raise RuntimeError('Band equalizer tidak didukung.')
-            if player.set_equalizer(new)==-1:raise RuntimeError('VLC menolak equalizer.')
+            # LibVLC set_equalizer replaces the whole filter chain. The engine now
+            # loads EQ + dynamics together at startup; this handle validates the profile.
             old=self.native;self.native=new
             if old is not None:old.release()
             new=None
