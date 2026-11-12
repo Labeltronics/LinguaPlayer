@@ -114,8 +114,8 @@ class Window(PlayerExtras,QMainWindow):
         render_row=QHBoxLayout();layout.addLayout(render_row);render_row.addWidget(self.renderer);render_row.addStretch()
         self.button(render_row,'Log video',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.log_path))))
         self.seek=QSlider(Qt.Horizontal); self.seek.setRange(0,1000); self.seek.sliderReleased.connect(lambda:self.player.set_position(self.seek.value()/1000)); row.addWidget(self.seek,1)
-        volume=QSlider(Qt.Horizontal); volume.setRange(0,200); volume.setValue(100); volume.setMaximumWidth(120); volume.valueChanged.connect(lambda value:self.player.audio_set_volume(value)); row.addWidget(QLabel('Volume'));row.addWidget(volume);self.player.audio_set_volume(100);self.volume=volume
-        self.volume_percent=QSpinBox();self.volume_percent.setRange(0,200);self.volume_percent.setValue(100);self.volume_percent.setSuffix(' %');volume.valueChanged.connect(self.volume_percent.setValue);self.volume_percent.valueChanged.connect(volume.setValue);row.addWidget(self.volume_percent);self.button(row,'BOOST Maks',lambda:self.audio_panel.boost_preset(20))
+        volume=QSlider(Qt.Horizontal); volume.setRange(0,200); volume.setValue(100); volume.setMaximumWidth(120); volume.valueChanged.connect(self.volume_changed); row.addWidget(QLabel('Volume'));row.addWidget(volume);self.player.audio_set_volume(100);self.volume=volume
+        self.volume_percent=QSpinBox();self.volume_percent.setRange(0,200);self.volume_percent.setValue(100);self.volume_percent.setSuffix(' %');volume.valueChanged.connect(self.volume_percent.setValue);self.volume_percent.valueChanged.connect(volume.setValue);row.addWidget(self.volume_percent);self.button(row,'BOOST Maks',lambda:self.audio_panel.boost_preset(20));self.button(row,'Normal 100%',lambda:self.audio_panel.boost_preset(0))
         self.ai_panel=QWidget();ai_layout=QVBoxLayout(self.ai_panel)
         row=QHBoxLayout();ai_layout.addLayout(row)
         self.key=QLineEdit(os.getenv('GEMINI_API_KEY',''));self.key.setEchoMode(QLineEdit.Password);self.key.setPlaceholderText('Gemini API key');row.addWidget(self.key)
@@ -191,7 +191,7 @@ class Window(PlayerExtras,QMainWindow):
         self.pending_seek=None;self.pending_pause=False
         self.player.stop();self.player.release();self.engine.release()
         self.engine=self.make_engine(index);self.player=self.engine.media_player_new();self.configure_video_output()
-        self.player.audio_set_volume(self.volume.value());self.player.audio_set_mute(self.mute_action.isChecked());self.apply_speed()
+        self.player.audio_set_volume(self.volume.value());self.player.audio_set_mute(self.mute_action.isChecked());self.request_audio_sync();self.apply_speed()
         self.audio_panel.reapply();self.apply_video_adjust()
         if self.path:
             self.player.set_media(self.engine.media_new_path(self.path))

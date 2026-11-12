@@ -1,23 +1,53 @@
-"""Packaged native gain controls; no claim of physical speaker loudness measurement."""
-import subprocess
+"""Measure actual libVLC software PCM output; no physical speaker claim."""
+import subprocess,array,ctypes,threading,math,time
 from pathlib import Path
-import imageio_ffmpeg
+import vlc,imageio_ffmpeg
 from playback_checks import wait_for,picture_stats
 from video_render import flags
+class PCMProbe:
+    def __init__(self):
+        self.lock=threading.Lock();self.energy=0.;self.count=0;self.discard=8820
+        @vlc.CallbackDecorators.AudioPlayCb
+        def play(opaque,samples,count,pts):
+            data=array.array('h',ctypes.string_at(samples,count*4))
+            with self.lock:
+                skip=min(len(data),self.discard);self.discard-=skip;values=data[skip:];self.energy+=sum(float(v)*v for v in values);self.count+=len(values)
+            time.sleep(min(count/44100,.02))
+        self.play=play
+        # Typed null callbacks keep ABI signatures valid while leaving optional hooks unset.
+        self.pause=vlc.CallbackDecorators.AudioPauseCb();self.resume=vlc.CallbackDecorators.AudioResumeCb();self.flush=vlc.CallbackDecorators.AudioFlushCb();self.drain=vlc.CallbackDecorators.AudioDrainCb()
+    def attach(self,player):
+        player.audio_set_callbacks(self.play,self.pause,self.resume,self.flush,self.drain,None);player.audio_set_format('S16N',44100,2)
+    def reset(self):
+        with self.lock:self.energy=0.;self.count=0;self.discard=8820
+    def read(self):
+        with self.lock:return self.count,math.sqrt(self.energy/self.count) if self.count else 0.
 
 def run_audio_boost_checks(window,root):
-    root=Path(root);source=root/'quiet-source.mp4';ff=imageio_ffmpeg.get_ffmpeg_exe();report={}
-    subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','color=c=blue:s=160x120:r=10:d=10','-f','lavfi','-i','sine=frequency=440:duration=10','-af','volume=0.01','-c:v','libx264','-c:a','aac','-shortest',str(source)],check=True,**flags())
-    window.open_path(str(source));wait_for(lambda:picture_stats(window)['audio_decoded']>0)
+    root=Path(root);source=root/'quiet-source.mp4';ff=imageio_ffmpeg.get_ffmpeg_exe();report={};measurements={};capture=PCMProbe()
+    subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','color=c=blue:s=160x120:r=10:d=12','-f','lavfi','-i','sine=frequency=440:duration=12','-af','volume=0.05','-ac','2','-c:v','libx264','-c:a','aac','-shortest',str(source)],check=True,**flags())
+    reference=subprocess.run([ff,'-v','error','-ss','0.3','-i',str(source),'-map','0:a:0','-t','0.5','-f','s16le','-ac','2','-ar','44100','pipe:1'],stdout=subprocess.PIPE,check=True,**flags()).stdout;values=array.array('h',reference);reference_rms=math.sqrt(sum(float(v)*v for v in values)/len(values))
+    window._selftest_audio_probe=capture
+    def ready():return window.pending_seek is None and not getattr(window,'audio_sync_deadline',0) and picture_stats(window)['audio_decoded']>0
+    def measure():
+        capture.reset();wait_for(lambda:capture.read()[0]>=44100,timeout=15);return capture.read()[1]
     try:
+        window.audio_panel.boost_preset(0);window.open_path(str(source));wait_for(ready,timeout=15);normal=measure();ratio=normal/reference_rms
+        if not .8<=ratio<=1.25:raise RuntimeError(f'Normal PCM unexpectedly attenuated/amplified: ratio={ratio:.3f}, VLC={normal:.3f}, reference={reference_rms:.3f}')
+        report['normal_pcm_matches_source_reference']='PASS';measurements.update(normal_rms=round(normal,3),reference_rms=round(reference_rms,3),normal_ratio=round(ratio,3))
         for gain in (12,20):
-            window.audio_panel.boost_preset(gain);wait_for(lambda:window.pending_seek is None and picture_stats(window)['audio_decoded']>0)
+            window.audio_panel.boost_preset(gain);wait_for(ready,timeout=15)
             if window.audio_panel.native is None or abs(window.audio_panel.native.get_preamp()-gain)>.1:raise RuntimeError('Native boost gain not applied')
-        if window.player.audio_get_volume()!=200:raise RuntimeError('Native volume 200% not applied')
-        report['native_volume_200_and_preamp_20db']='PASS';window.mute_action.setChecked(True);window.set_muted(True);window.change_renderer(window.renderer.currentIndex());wait_for(lambda:window.pending_seek is None and picture_stats(window)['audio_decoded']>0)
+            level=measure();measurements['boost_'+str(gain)+'db_ratio']=round(level/normal,3)
+            if level<normal*2:raise RuntimeError(f'Boost did not increase actual PCM: gain={gain}, level={level}, normal={normal}')
+        if window.player.audio_get_volume()!=200:raise RuntimeError('Native volume 200% not applied: '+str(window.player.audio_get_volume()))
+        report['native_volume_200_and_preamp_20db']='PASS';report['actual_pcm_boost_increases_level']='PASS';window.mute_action.setChecked(True);window.set_muted(True);window.change_renderer(window.renderer.currentIndex());wait_for(ready,timeout=15)
         if not window.player.audio_get_mute() or abs(window.audio_panel.native.get_preamp()-20)>.1:raise RuntimeError('Boost/mute lost on renderer restart')
-        report['boost_and_mute_persist_on_renderer_restart']='PASS';window.mute_action.setChecked(False);window.set_muted(False);window.audio_panel.boost_preset(0);wait_for(lambda:window.pending_seek is None and picture_stats(window)['audio_decoded']>0)
-        if window.player.audio_get_volume()!=100 or window.audio_panel.state()['boost']!=0:raise RuntimeError('Boost reset failed')
-        report['reset_to_normal']='PASS';report['physical_speaker_measurement']='NOT_PERFORMED_ON_CI'
-    finally:window.stop()
+        report['boost_and_mute_persist_on_renderer_restart']='PASS';window.mute_action.setChecked(False);window.set_muted(False);window.audio_panel.boost_preset(0);wait_for(ready,timeout=15)
+        if window.player.audio_get_volume()!=100 or window.audio_panel.state()['boost']!=0 or window.audio_panel.native is not None or window.audio_dsp!='off':raise RuntimeError('Unity/bypass reset failed')
+        reset=measure();measurements['reset_ratio']=round(reset/reference_rms,3)
+        if not .8<=reset/reference_rms<=1.25:raise RuntimeError('Reset did not restore original PCM level')
+        report['reset_to_normal_unity_and_eq_dsp_bypass']='PASS';report['measurements']=measurements;report['physical_speaker_measurement']='NOT_PERFORMED_ON_CI'
+    finally:
+        window.stop();window._selftest_audio_probe=None;window.change_renderer(window.renderer.currentIndex())
     return report

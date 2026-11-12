@@ -60,5 +60,12 @@ class AudioUITests(unittest.TestCase):
         try:
             self.assertEqual(w.volume.maximum(),200);w.audio_panel.boost_preset(20);self.assertEqual(w.volume.value(),200);w.audio_panel.native.set_preamp.assert_called_with(20)
             w.audio_panel.enabled.setChecked(False);w.audio_panel.apply();w.audio_panel.native.set_preamp.assert_called_with(20);self.assertTrue(w.audio_panel.state()['peak_guard'])
-            w.mute_action.setChecked(True);w.change_renderer(w.renderer.currentIndex());w.player.audio_set_mute.assert_called_with(True);w.audio_panel.boost_preset(0);self.assertEqual(w.volume.value(),100);self.assertEqual(w.audio_panel.state()['boost'],0)
+            w.mute_action.setChecked(True);w.change_renderer(w.renderer.currentIndex());w.player.audio_set_mute.assert_called_with(True);w.audio_panel.boost_preset(0);self.assertEqual(w.volume.value(),100);self.assertEqual(w.audio_panel.state()['boost'],0);self.assertIsNone(w.audio_panel.native);self.assertFalse(w.audio_panel.enabled.isChecked());self.assertEqual(w.audio_dsp,'off')
         finally:w.close();q.processEvents()
+
+    @patch.object(app.vlc,'Instance',side_effect=fake_engine)
+    def test_deferred_volume_applied_when_output_becomes_ready(self,engine):
+        w=app.Window()
+        try:
+            w.player.audio_set_volume.side_effect=[-1,0];w.player.audio_get_volume.return_value=100;w.player.audio_get_mute.return_value=0;w.request_audio_sync();w.sync_master_audio();self.assertGreater(w.audio_sync_deadline,0);w.sync_master_audio();self.assertEqual(w.audio_sync_deadline,0);w.player.audio_set_volume.assert_called_with(100)
+        finally:w.player.audio_set_volume.side_effect=None;w.close();q.processEvents()

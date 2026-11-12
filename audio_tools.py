@@ -91,7 +91,7 @@ class AudioPanel(QWidget):
         self.rebuild_presets();self.load();self._loading=False;self.changed()
     def boost_preset(self,value):
         self.owner.audio_dsp='off';self._limiter_active=None
-        self.set_state({'enabled':True,'preamp':0,'bands':[0.]*10,'headroom':True,'boost':value,'peak_guard':True})
+        self.set_state({'enabled':value>0,'preamp':0,'bands':[0.]*10,'headroom':value>0,'boost':value,'peak_guard':True})
         self.preset.blockSignals(True);self.preset.setCurrentText('Normal / Flat' if value==0 else 'Manual');self.preset.blockSignals(False)
         self.owner.volume.setValue(200 if value>=20 else 100 if value==0 else max(100,self.owner.volume.value()));self.apply()
         self.owner.status.setText(f'Audio Boost {value:+g} dB • volume {self.owner.volume.value()}%. Bila suara pecah, kurangi boost. Kompresor bukan limiter brick-wall setelah semua gain.')

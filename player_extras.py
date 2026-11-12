@@ -1,4 +1,4 @@
-import os,json,random
+import os,json,random,sys,time
 from pathlib import Path
 from PySide6.QtCore import Qt,QTimer,QEvent
 from PySide6.QtGui import QAction
@@ -103,7 +103,7 @@ class PlayerExtras(CinemaTools):
         for i in range(self.playlist_widget.count()):
             if self.playlist_widget.item(i).data(Qt.UserRole)==path:self.playlist_widget.setCurrentRow(i);break
         self.setWindowTitle(f'Cyber80 Players {self.window_number} • '+Path(path).name)
-        self.apply_speed();self.player.audio_set_mute(self.mute_action.isChecked());self.cinema_opened()
+        self.apply_speed();self.player.audio_set_mute(self.mute_action.isChecked());self.request_audio_sync();self.cinema_opened()
         subtitle=Path(path).with_suffix('.srt')
         if subtitle.is_file():
             try:
@@ -139,7 +139,7 @@ class PlayerExtras(CinemaTools):
             else:return
         self.play_item(self.playlist_widget.item(target))
     def extra_tick(self):
-        self.cinema_tick();self.modern_tick()
+        self.sync_master_audio();self.cinema_tick();self.modern_tick()
         if not self._end_handled and self.path and self.player.get_state()==vlc.State.Ended and not self.processing and self.job is None:
             self._end_handled=True
             if self.auto_next_box.isChecked():QTimer.singleShot(0,lambda:self.next_film(1,True))
@@ -153,7 +153,18 @@ class PlayerExtras(CinemaTools):
         if hasattr(self,'speed_box'):
             rate=self.speed_box.value()
             if self.player.set_rate(rate)==-1:self.status.setText('Kecepatan ini tidak didukung oleh media/perangkat saat ini.')
-    def set_muted(self,value):self.player.audio_set_mute(bool(value))
+    def set_muted(self,value):
+        self.player.audio_set_mute(bool(value));self.request_audio_sync()
+    def request_audio_sync(self):self.audio_sync_deadline=time.monotonic()+10
+    def sync_master_audio(self):
+        if not getattr(self,'audio_sync_deadline',0) or time.monotonic()>self.audio_sync_deadline:return
+        wanted=self.volume.value();muted=self.mute_action.isChecked()
+        try:
+            result=self.player.audio_set_volume(wanted);self.player.audio_set_mute(muted)
+            if result==0 and self.player.audio_get_volume()==wanted and bool(self.player.audio_get_mute())==muted:self.audio_sync_deadline=0
+        except Exception:pass
+    def volume_changed(self,value):
+        self.player.audio_set_volume(value);self.request_audio_sync()
     def toggle_fullscreen(self):
         if self.pip is not None and self.pip.isFullScreen():
             if self._fullscreen_was_pip:self.pip.showNormal();self.pip.full_button.setText('Fullscreen (F11)')
@@ -167,6 +178,8 @@ class PlayerExtras(CinemaTools):
         self.stereo_on=bool(enabled);self._last_frame_revision=-1;self._last_frame=None
         self.video.clear_frame();self.change_renderer(self.renderer.currentIndex())
     def configure_video_output(self):
+        probe=getattr(self,'_selftest_audio_probe',None)
+        if '--self-test' in sys.argv and probe is not None:probe.attach(self.player)
         if getattr(self,'stereo_on',False) or self.canvas_active():
             size=(960,540) if self.stereo_on or getattr(self,'tv_active',False) else (3840,2160)
             self.memory_video=MemoryVideo(self.player,*size);self.video.setAttribute(Qt.WA_NoSystemBackground,False)
