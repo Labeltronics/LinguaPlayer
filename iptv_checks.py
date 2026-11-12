@@ -36,6 +36,7 @@ def run_iptv_checks(owner,root):
         rows[0]['headers']={'User-Agent':'Cyber80-Acceptance','Referer':'https://example.test/'}
         tv.got_rows(rows);assert len(tv.visible_rows)==1;tv.table.selectRow(0);tv.play()
         wait(lambda:tv.preview is not None and tv.preview.player.get_time()>300)
+        assert owner.stream_audio_available is True and not owner.mute_action.isChecked() and owner.volume.value()>0
         assert tv.preview.player is owner.player and owner.path=='' and owner.stream_url==rows[0]['url']
         owner.audio_panel.boost_preset(6);wait(lambda:owner.pending_seek is None and owner.player.get_time()>100)
         assert owner.stream_url==rows[0]['url']
@@ -49,7 +50,7 @@ def run_iptv_checks(owner,root):
             tv.start_subtitles();wait(lambda:bool(tv.caption_queue),45);wait(lambda:tv.caption_label.text()=='Subtitle Indonesia');assert api.call_count>=1
             tv.stop_subtitles();wait(lambda:tv.caption_job is None)
         tv.lock.unlocked=True;tv.section.addItem('Daftar 18+','adult');tv.section.setCurrentIndex(1);tv.got_rows(rows);assert len(tv.visible_rows)==1 and tv.visible_rows[0]['adult'];tv.relock();assert len(tv.visible_rows)==1 and tv.preview.released
-        return {'native_vlc_and_subtitles_required_http_headers':'PASS','actual_video_preflight':'PASS','adult_separate_list_after_unlock':'PASS','online_native_logs_disabled':'PASS','pip_close_button_returns_to_player':'PASS','shared_full_player_engine':'PASS','eq_renderer_restart_preserves_online_source':'PASS','online_pip_preserves_source':'PASS','bundled_catalog_auto_load':'PASS','m3u_http_station_playback':'PASS','continuous_ffmpeg_audio_capture':'PASS','translated_caption_display':'PASS_MOCK_STT_NO_NETWORK_API','parental_default_lock_relock':'PASS','live_gemini_on_public_station':'NOT_RUN_NO_CREDENTIAL','public_catalog_availability':'NOT_GUARANTEED'}
+        return {'av_preflight_and_default_sound_enabled':'PASS','native_vlc_and_subtitles_required_http_headers':'PASS','actual_video_preflight':'PASS','adult_separate_list_after_unlock':'PASS','online_native_logs_disabled':'PASS','pip_close_button_returns_to_player':'PASS','shared_full_player_engine':'PASS','eq_renderer_restart_preserves_online_source':'PASS','online_pip_preserves_source':'PASS','bundled_catalog_auto_load':'PASS','m3u_http_station_playback':'PASS','continuous_ffmpeg_audio_capture':'PASS','translated_caption_display':'PASS_MOCK_STT_NO_NETWORK_API','parental_default_lock_relock':'PASS','live_gemini_on_public_station':'NOT_RUN_NO_CREDENTIAL','public_catalog_availability':'NOT_GUARANTEED'}
     finally:
         owner.key.setText(key);tv.stop_subtitles()
         if tv.caption_job:wait(lambda:tv.caption_job is None)

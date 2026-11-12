@@ -57,7 +57,7 @@ class OnlinePreview:
 
 class OnlineMedia:
     def setup_online(self,menu):
-        self.stream_headers={};self.online_job=None;self.online_record_job=None;self.last_online_recording='';self.last_online_source='';self.online_caption=None;self.online_cues=[];self.online_clock=0.;self.stream_live=False;self.stream_title='';self.online_browser=None
+        self.stream_audio_available=None;self.stream_headers={};self.online_job=None;self.online_record_job=None;self.last_online_recording='';self.last_online_source='';self.online_caption=None;self.online_cues=[];self.online_clock=0.;self.stream_live=False;self.stream_title='';self.online_browser=None
         self.online_dock=QDockWidget('Media online • kontrol Cyber80 bersama',self);self.online_dock.setObjectName('online_media');panel=QWidget();box=QVBoxLayout(panel)
         self.online_status=QLabel('Media browser/TV memakai mesin pemutar yang sama: volume/EQ, fullscreen/PiP, zoom, capture, 3D preview dan Cast. Seek/speed bergantung stream. Editing/ekspor membutuhkan rekaman/unduhan lokal.');self.online_status.setTextFormat(Qt.PlainText);self.online_status.setWordWrap(True);box.addWidget(self.online_status)
         row=QHBoxLayout();box.addLayout(row)
@@ -69,7 +69,7 @@ class OnlineMedia:
         if self.job is not None and self.job.isRunning():self.status.setText('Batalkan subtitle file sebelum mengganti media.');return None
         from tv_tuning import media_headers
         approved_headers=media_headers(headers)
-        source=checked_url(url);self.stream_headers=approved_headers;was_online=bool(self.stream_url);self.record_position();self.surface_generation+=1;self.player.stop();self.path='';self.stream_url=source;self.stream_title=title;self.stream_live=live;self.online_browser=browser;self.online_caption=None;self.online_cues=[];self.pending_seek=None;self.pending_pause=False;self.playback_error_reported=False;self.cache_context=None;self.retry_context=None;self.resume_offset=0;self.ab_a=None;self.ab_b=None
+        source=checked_url(url);self.stream_audio_available=None;self.stream_headers=approved_headers;was_online=bool(self.stream_url);self.record_position();self.surface_generation+=1;self.player.stop();self.path='';self.stream_url=source;self.stream_title=title;self.stream_live=live;self.online_browser=browser;self.online_caption=None;self.online_cues=[];self.pending_seek=None;self.pending_pause=False;self.playback_error_reported=False;self.cache_context=None;self.retry_context=None;self.resume_offset=0;self.ab_a=None;self.ab_b=None
         self.tv_generation+=1;self.tv_last_revision=-1;self.cues_4d=[]
         if not was_online:self.change_renderer(self.renderer.currentIndex())
         self.bind_video();media=self.make_stream_media();self.player.set_media(media);self.video.audio_title='';self.video.clear_frame();self.fill([])
@@ -83,6 +83,7 @@ class OnlineMedia:
     def start_online_subtitles(self,language=None):
         if not self.stream_url:self.status.setText('Putar media online terlebih dahulu.');return
         if self.online_job:return
+        if self.stream_audio_available is False:self.online_status.setText('Subtitle membutuhkan audio; sumber TV ini hanya mengirim video.');return
         # QPushButton.clicked may supply a boolean argument.
         if not isinstance(language,str):language=self.lang.currentData() if self.lang.currentIndex()>=0 and self.lang.currentText()==self.lang.itemText(self.lang.currentIndex()) else self.lang.currentText().strip()
         if not self.key.text().strip():self.online_status.setText('Isi Gemini API key pada Subtitle / AI.');return

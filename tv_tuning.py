@@ -30,7 +30,7 @@ def candidates(rows,selected,limit=4):
     return result
 
 def decode_frame(row,cancelled=lambda:False,timeout=12):
-    url=checked_url(row['url']);args=[imageio_ffmpeg.get_ffmpeg_exe(),'-v','info','-rw_timeout','8000000',*ffmpeg_headers(row.get('headers')),'-analyzeduration','4000000','-probesize','4000000','-i',url,'-map','0:v:0','-an','-frames:v','1','-f','null','-']
+    url=checked_url(row['url']);args=[imageio_ffmpeg.get_ffmpeg_exe(),'-v','info','-rw_timeout','8000000',*ffmpeg_headers(row.get('headers')),'-analyzeduration','4000000','-probesize','4000000','-i',url,'-map','0:v:0','-map','0:a:0?','-frames:v','1','-t','1','-f','null','-']
     with tempfile.TemporaryFile() as log:
         proc=subprocess.Popen(args,stdout=subprocess.DEVNULL,stderr=log,**flags());deadline=time.monotonic()+timeout;timed=False
         try:
@@ -44,7 +44,7 @@ def decode_frame(row,cancelled=lambda:False,timeout=12):
         log.seek(0);text=log.read(512*1024).decode(errors='replace')
     if cancelled():raise InterruptedError('Dibatalkan')
     if timed:return False,'Timeout / sinyal lambat'
-    if proc.returncode==0 and re.search(r'frame=\s*[1-9]',text):return True,'Frame video terdeteksi'
+    if proc.returncode==0 and re.search(r'frame=\s*[1-9]',text):return True,('Gambar dan audio terdeteksi' if 'Audio:' in text else 'Video terdeteksi; sumber tanpa audio')
     for code in ('401','403','404','410','451'):
         if re.search(r'(?i)(?:HTTP[^\n]*|server returned|error|status)[^\n]*\b'+code+r'\b',text):return False,'Sumber menolak HTTP '+code
     if 'Audio:' in text and 'Video:' not in text:return False,'Hanya audio / radio'
@@ -55,6 +55,7 @@ class TuneTV(QThread):
     def __init__(self,rows,selected):super().__init__();self.rows=candidates(rows,selected);self.stop_event=threading.Event()
     def cancel(self):self.stop_event.set();self.requestInterruption()
     def run(self):
+        video_only=None
         for i,row in enumerate(self.rows):
             if self.stop_event.is_set():return
             self.checked.emit(row['key'],f'Memeriksa gambar {i+1}/{len(self.rows)} …')
@@ -63,6 +64,9 @@ class TuneTV(QThread):
             except Exception:ok,status=False,'Sumber/header tidak dapat diproses'
             self.checked.emit(row['key'],status)
             if ok:
-                if not self.stop_event.is_set():self.ready.emit(row)
-                return
+                if status=='Gambar dan audio terdeteksi':
+                    if not self.stop_event.is_set():self.ready.emit({**row,'_has_audio':True})
+                    return
+                if video_only is None:video_only={**row,'_has_audio':False}
+        if video_only is not None and not self.stop_event.is_set():self.ready.emit(video_only);return
         if not self.stop_event.is_set():self.failed.emit('Tidak ada sumber bergambar yang dapat dipakai saat ini. Perbarui katalog atau pilih saluran lain. Pembatasan wilayah/izin siaran tidak dibuka oleh aplikasi.')

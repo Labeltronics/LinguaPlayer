@@ -58,6 +58,7 @@ class InternetTV(QDialog):
         row=QHBoxLayout();box.addLayout(row);self.subtitle_language=QLineEdit('id');self.subtitle_language.setMaximumWidth(70);row.addWidget(QLabel('Bahasa subtitle (ISO)'));row.addWidget(self.subtitle_language)
         b=QPushButton('Aktifkan subtitle online saluran');b.clicked.connect(self.start_subtitles);row.addWidget(b);b=QPushButton('Hentikan subtitle');b.clicked.connect(self.stop_subtitles);row.addWidget(b)
         self.compat=QCheckBox('Tampilan kompatibel CPU untuk TV');self.compat.setChecked(True);row.addWidget(self.compat)
+        self.auto_audio=QCheckBox('Aktifkan suara saat buka TV');self.auto_audio.setChecked(True);row.addWidget(self.auto_audio)
         self.subtitle_status=QLabel('Subtitle TV memakai Gemini dari potongan audio 15 detik. Ada jeda API; bukan siaran tanpa delay.');self.subtitle_status.setWordWrap(True);box.addWidget(self.subtitle_status)
         note=QLabel('Katalog publik IPTV-org berisi tautan siaran publik, tanpa saluran NSFW bawaan. Tidak semua saluran tersedia di setiap wilayah atau selalu online. Tidak membuka premium/DRM. Impor playlist Anda sendiri untuk saluran yang Anda berhak akses. Kategori 18+ pada playlist impor memerlukan PIN; metadata dapat salah sehingga PIN bukan penyaring isi video otomatis.');note.setWordWrap(True);box.addWidget(note)
         self.status=QLabel('Memuat daftar saluran bawaan. Pilih negara dan saluran; siaran memerlukan internet.');self.status.setWordWrap(True);box.addWidget(self.status)
@@ -116,7 +117,23 @@ class InternetTV(QDialog):
         if self.preview and not self.preview.released:self.preview.close()
         if self.compat.isChecked():self.owner.renderer.setCurrentIndex(0)
         self.playing_row=r;self.preview=self.owner.open_stream(r['url'],'Internet TV • '+r['name'],live=True,headers=r.get('headers'));self.caption_label=self.owner.subtitle
-        if self.preview:self.preview.show();self.hide()
+        if self.preview:
+            self.owner.stream_audio_available=r.get('_has_audio')
+            if not r.get('_has_audio',True):self.owner.online_status.setText('Video tersedia, tetapi sumber ini tidak mengirim track audio. Coba sumber lain untuk suara.')
+            if self.auto_audio.isChecked():
+                self.owner.mute_action.setChecked(False);self.owner.set_muted(False)
+                if self.owner.volume.value()==0:self.owner.volume.setValue(100)
+                QTimer.singleShot(500,lambda:self.ensure_audio(generation,12))
+            self.preview.show();self.hide()
+    def ensure_audio(self,generation,attempts):
+        if generation!=self.tune_generation or not self.preview or self.preview.released:return
+        try:
+            player=self.owner.player
+            if player.audio_get_track()<0:
+                tracks=[t for t in (player.audio_get_track_description() or []) if t[0]>=0]
+                if tracks:player.audio_set_track(tracks[0][0]);return
+                if attempts>0:QTimer.singleShot(500,lambda:self.ensure_audio(generation,attempts-1))
+        except Exception:pass
     def tune_finished(self):self.tune_job.deleteLater();self.tune_job=None
     @property
     def caption_job(self):return self.owner.online_job if self.preview and not self.preview.released else None

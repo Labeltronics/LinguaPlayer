@@ -20,7 +20,7 @@ class TVTuningTests(unittest.TestCase):
         ff=imageio_ffmpeg.get_ffmpeg_exe()
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);video=root/'video.mp4';audio=root/'audio.wav'
-            subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','color=s=160x90:r=5:d=1','-c:v','libx264','-movflags','+faststart',str(video)],check=True,**flags())
+            subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','color=s=160x90:r=5:d=1','-f','lavfi','-i','sine=duration=1','-c:a','aac','-c:v','libx264','-movflags','+faststart',str(video)],check=True,**flags())
             subprocess.run([ff,'-v','error','-y','-f','lavfi','-i','sine=duration=1',str(audio)],check=True,**flags())
             class Handler(SimpleHTTPRequestHandler):
                 def __init__(self,*args,**kwargs):super().__init__(*args,directory=d,**kwargs)
@@ -32,7 +32,7 @@ class TVTuningTests(unittest.TestCase):
             server=ThreadingHTTPServer(('127.0.0.1',0),Handler);threading.Thread(target=server.serve_forever,daemon=True).start();base=f'http://127.0.0.1:{server.server_port}'
             bad={'id':'one','url':base+'/missing.mp4','key':'bad','adult':False};good={'id':'one','url':base+'/video.mp4','key':'good','adult':False,'headers':{'User-Agent':'Cyber80-test','Referer':'https://example.test/'}}
             try:
-                self.assertFalse(decode_frame({**good,'headers':{}})[0]);self.assertTrue(decode_frame(good)[0]);self.assertIn('Hanya audio',decode_frame({'url':base+'/audio.wav'})[1])
+                self.assertFalse(decode_frame({**good,'headers':{}})[0]);self.assertEqual(decode_frame(good),(True,'Gambar dan audio terdeteksi'));self.assertIn('Hanya audio',decode_frame({'url':base+'/audio.wav'})[1])
                 job=TuneTV([bad,good],bad);result=[];job.ready.connect(result.append);job.start();end=time.monotonic()+15
                 while job.isRunning() and time.monotonic()<end:QApplication.processEvents();time.sleep(.01)
                 job.wait(1000);QApplication.processEvents();self.assertEqual(result[0]['key'],'good')
@@ -54,3 +54,9 @@ class TVTuningTests(unittest.TestCase):
         finally:tv.deleteLater();owner.deleteLater();QApplication.processEvents()
     def test_alternatives_do_not_cross_adult_boundary(self):
         selected={'id':'one','url':'https://example.test/a','adult':False};self.assertEqual(len(candidates([selected,{'id':'one','url':'https://example.test/b','adult':True}],selected)),1)
+
+    def test_prefers_alternative_with_audio_over_silent_video(self):
+        silent={'id':'one','url':'https://example.test/silent','key':'silent'};av={'id':'one','url':'https://example.test/av','key':'av'}
+        job=TuneTV([silent,av],silent);result=[];job.ready.connect(result.append)
+        with patch('tv_tuning.decode_frame',side_effect=[(True,'Video terdeteksi; sumber tanpa audio'),(True,'Gambar dan audio terdeteksi')]):job.run()
+        self.assertEqual(result[0]['key'],'av');self.assertTrue(result[0]['_has_audio'])
