@@ -31,4 +31,7 @@ def configure(player,state,mode='off'):
     set_value('equalizer-preamp',0x50,plan['eq_preamp']);set_value('equalizer-bands',0x40,' '.join(format(v,'.9g') for v in plan['bands']));set_value('equalizer-2pass',0x20,False);set_value('gain-value',0x50,plan['multiplier'])
     for name,value in plan['parameters'].items():set_value(name,0x50,value)
     set_value('audio-filter',0x40,':'.join(plan['filters']))
+    # Release any cached output so it inherits the new per-player variables.
+    # Null format callbacks do not change the selected output driver.
+    player.audio_set_format_callbacks(vlc.CallbackDecorators.AudioSetupCb(),vlc.CallbackDecorators.AudioCleanupCb())
     return True
