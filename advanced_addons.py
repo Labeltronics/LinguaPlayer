@@ -6,13 +6,13 @@ from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButto
 from depth_stereo import StereoWorker,StereoExport,DEFAULT_MODEL
 class AdvancedAddons:
     def setup_addons(self):
-        self.language_studio=None;self.download_manager=None;self.browsers=[];self.cut_editor=None;self.video_studio=None;self.tv_active=False;self.tv_worker=None;self.tv_export=None;self.tv_generation=0;self.tv_last_revision=-1;self.wheel_remainder=0;self.wheel_hook=None
+        self.internet_tv=None;self.language_studio=None;self.download_manager=None;self.browsers=[];self.cut_editor=None;self.video_studio=None;self.tv_active=False;self.tv_worker=None;self.tv_export=None;self.tv_generation=0;self.tv_last_revision=-1;self.wheel_remainder=0;self.wheel_hook=None
         self.wheel_seconds=5
         if self.storage_enabled:
             try:self.wheel_seconds=max(1,min(300,int(self.settings.value('wheel_seconds',5))))
             except (ValueError,TypeError):pass
         menu=self.menuBar().addMenu('Cyber80 Hub')
-        for title,fn in [('Studio Bahasa • Subtitle / Dubbing / Lirik',self.open_language_studio),('Browser multimedia • Privat',lambda:self.open_browser(True)),('Browser normal (opsional)',lambda:self.open_browser(False)),('Download Manager',lambda:self.get_download_manager().show()),('Video Studio • Editor multilayer',lambda:self.open_video_studio()),('Koleksi media',self.show_collection),('Cutting visual',self.open_cut_editor),('3D / 4D Cinema',self.show_tv),('Atur scroll seek',self.set_wheel_seconds)]:menu.addAction(title,fn)
+        for title,fn in [('Internet TV / IPTV',self.open_internet_tv),('Studio Bahasa • Subtitle / Dubbing / Lirik',self.open_language_studio),('Browser multimedia • Privat',lambda:self.open_browser(True)),('Browser normal (opsional)',lambda:self.open_browser(False)),('Download Manager',lambda:self.get_download_manager().show()),('Video Studio • Editor multilayer',lambda:self.open_video_studio()),('Koleksi media',self.show_collection),('Cutting visual',self.open_cut_editor),('3D / 4D Cinema',self.show_tv),('Atur scroll seek',self.set_wheel_seconds)]:menu.addAction(title,fn)
         self.tv_dock=QDockWidget('3D TV / Depth AI / 4D cue preview',self);self.tv_dock.setObjectName('tv3d');panel=QWidget();box=QVBoxLayout(panel)
         row=QHBoxLayout();box.addLayout(row);self.tv_enable=QCheckBox('Aktifkan stereo TV (bukan anaglyph)');row.addWidget(self.tv_enable)
         self.tv_input=QComboBox()
@@ -76,6 +76,11 @@ class AdvancedAddons:
         browser=next((b for b in self.browsers if b.private==private),None)
         if browser is None:browser=BrowserWindow(self,private or self.private_session);self.browsers.append(browser)
         browser.showNormal();browser.raise_();browser.activateWindow();return browser
+    def open_internet_tv(self):
+        if self.internet_tv is None:
+            from iptv_window import InternetTV
+            self.internet_tv=InternetTV(self)
+        self.internet_tv.showNormal();self.internet_tv.raise_();self.internet_tv.activateWindow();return self.internet_tv
     def open_language_studio(self):
         if self.language_studio is None:
             from language_studio import LanguageStudio
@@ -163,6 +168,11 @@ class AdvancedAddons:
         t=max(0,self.player.get_time())/1000;active=[c for c in self.cues_4d if c['start']<=t<c['start']+c['duration']]
         self.cue_4d_label.setText('4D preview: '+', '.join(f'{c["effect"]} {c["intensity"]}%' for c in active) if active else '4D: tidak ada cue aktif (preview saja)')
     def addons_can_close(self):
+        tv=getattr(self,'internet_tv',None)
+        if tv:
+            if tv.job is not None:tv.cancel();self.status.setText('Menunggu impor TV selesai.');return False
+            if tv.caption_job is not None:tv.stop_subtitles();self.status.setText('Menunggu subtitle TV berhenti.');return False
+            tv.relock()
         language=getattr(self,'language_studio',None)
         if language and language.job is not None:
             self.status.setText('Studio Bahasa masih bekerja. Sembunyikan aplikasi, atau batalkan dan tunggu pekerjaan selesai.');return False

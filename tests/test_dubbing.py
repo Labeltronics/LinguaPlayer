@@ -10,7 +10,7 @@ class DubbingTests(unittest.TestCase):
     def test_lrc_centisecond_rounding(self):
         self.assertIn('[01:00.00]Halo',lrc([Cue(59.999,61,'Halo')]))
     def test_tts_pcm_and_bad_responses(self):
-        response={'candidates':[{'finishReason':'STOP','content':{'parts':[{'inlineData':{'mimeType':'audio/L16;rate=24000','data':base64.b64encode(b'\0\0'*20).decode()}}]}}]}
+        response={'candidates':[{'finishReason':'STOP','content':{'parts':[{'inlineData':{'mimeType':'audio/L16;codec=pcm;rate=24000','data':base64.b64encode(b'\0\0'*20).decode()}}]}}]}
         self.assertEqual(decode_audio(response),(b'\0\0'*20,24000))
         for value in ({},{'candidates':[{'finishReason':'MAX_TOKENS'}]}):
             with self.assertRaises(ValueError):decode_audio(value)
@@ -28,7 +28,7 @@ class DubbingTests(unittest.TestCase):
     def test_gemini_request_payload_without_network(self):
         from unittest.mock import patch
         from dubbing import DubbingJob
-        response={'candidates':[{'finishReason':'STOP','content':{'parts':[{'inlineData':{'mimeType':'audio/L16;rate=24000','data':base64.b64encode(b'\0\0'*100).decode()}}]}}]}
+        response={'candidates':[{'finishReason':'STOP','content':{'parts':[{'inlineData':{'mimeType':'audio/L16;codec=pcm;rate=24000','data':base64.b64encode(b'\0\0'*100).decode()}}]}}]}
         with tempfile.TemporaryDirectory() as d,patch('dubbing.request_json',return_value=response) as request:
             job=DubbingJob('source','out',[],key='synthetic-test-not-a-real-key')
             job.synthesize('Halo Indonesia',Path(d)/'out.wav',d)

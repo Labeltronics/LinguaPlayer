@@ -1,5 +1,5 @@
 """Bounded subtitle-to-speech and aligned export; no credentials persisted."""
-import base64, json, math, os, re, subprocess, tempfile, time, uuid, wave, threading
+import base64, json, math, os, re, subprocess, tempfile, time, uuid, wave, threading, shutil
 from contextlib import contextmanager
 from pathlib import Path
 from PySide6.QtCore import QThread, Signal
@@ -33,9 +33,12 @@ def decode_audio(response):
     for part in candidates[0].get('content',{}).get('parts',[]):
         inline=part.get('inlineData',{});mime=inline.get('mimeType','')
         if not inline:continue
-        match=re.fullmatch(r'audio/(?:L16|pcm);rate=(\d+)',mime,re.I)
-        if not match:raise ValueError('Format audio TTS tidak didukung; diharapkan PCM 16-bit mono.')
-        current=int(match[1])
+        pieces=[piece.strip() for piece in mime.lower().split(';')];parameters={}
+        for piece in pieces[1:]:
+            if '=' not in piece:raise ValueError('Parameter audio TTS tidak valid.')
+            k,v=piece.split('=',1);parameters[k.strip()]=v.strip()
+        if pieces[0] not in ('audio/l16','audio/pcm') or parameters.get('codec','pcm')!='pcm' or parameters.get('channels','1')!='1' or not parameters.get('rate','').isdigit():raise ValueError('Format audio TTS tidak didukung; diharapkan PCM 16-bit mono.')
+        current=int(parameters['rate'])
         if current not in (16000,22050,24000,44100,48000) or rate not in (None,current):raise ValueError('Sample rate TTS tidak valid.')
         rate=current;chunks.append(base64.b64decode(inline.get('data',''),validate=True))
     pcm=b''.join(chunks)
@@ -165,6 +168,20 @@ class DubbingJob(QThread):
                 # Exclusive link publishes completed output without overwriting another job's file.
                 try:os.link(partial,target)
                 except FileExistsError:raise ValueError('Nama hasil sudah dipakai proses lain. Pilih nama baru.')
+                except OSError:
+                    # FAT/exFAT do not support hard links. Exclusive creation still protects existing files.
+                    created=False
+                    try:
+                        with target.open('xb') as dest,partial.open('rb') as src:
+                            created=True
+                            while True:
+                                if self.cancelled():raise InterruptedError('Dibatalkan')
+                                block=src.read(4*1024*1024)
+                                if not block:break
+                                dest.write(block)
+                    except Exception:
+                        if created:target.unlink(missing_ok=True)
+                        raise
                 partial.unlink()
                 if self.clone_session:self.clone_session.close();self.clone_session=None
                 return str(target)

@@ -419,6 +419,8 @@ if __name__=='__main__':
                     with tempfile.TemporaryDirectory(prefix='cyber80-dubbing-test-') as dub_root:playback['dubbing']=run_dubbing_checks(Path(dub_root))
                     assert (ROOT/'sapi_dubbing.ps1').is_file()
                     language=w.open_language_studio();assert language.job is None;language.hide()
+                    from iptv_checks import run_iptv_checks
+                    with tempfile.TemporaryDirectory(prefix='cyber80-iptv-test-') as tv_root:playback['internet_tv']=run_iptv_checks(w,Path(tv_root))
                     from audio_checks import run_audio_boost_checks
                     with tempfile.TemporaryDirectory(prefix='cyber80-boost-test-') as boost_root:playback['audio_boost']=run_audio_boost_checks(w,Path(boost_root))
                     from browser_checks import run_browser_checks

@@ -36,6 +36,9 @@ def main():
                     with torch.inference_mode():
                         source_se=converter.extract_se(str(source));target_se=converter.extract_se(str(reference))
                         converter.convert(str(source),source_se,target_se,str(output),tau=.3,message='Cyber80 AI dubbing')
+                    import soundfile as sf,numpy as np
+                    audio,sample_rate=sf.read(str(output))
+                    if not np.isfinite(audio).all() or len(audio)<sample_rate*.05:raise ValueError('Audio cloning tidak valid/kosong.')
                     atomic(request.with_suffix('.done'),{'ok':True})
                 except Exception as exc:atomic(request.with_suffix('.done'),{'ok':False,'error':type(exc).__name__+': '+str(exc)[:500]})
             time.sleep(.05)

@@ -29,19 +29,16 @@ Expand-Archive -LiteralPath $CodeZip -DestinationPath $Code -Force
 $Repo=Join-Path $Code "OpenVoice-$Commit"
 Run-Checked -Arguments @('-m','pip','install','--no-deps',$Repo)
 Remove-Item $CodeZip
-$ModelZip=Join-Path $Destination 'checkpoints.zip'
-Write-Host 'Mengunduh model converter resmi OpenVoice V2 ...'
-Invoke-WebRequest 'https://myshell-public-repo-host.s3.amazonaws.com/openvoice/checkpoints_v2_0417.zip' -OutFile $ModelZip
-$Unpack=Join-Path $Destination 'checkpoint-download'
-Expand-Archive -LiteralPath $ModelZip -DestinationPath $Unpack -Force
-$Converter=Get-ChildItem $Unpack -Recurse -Filter config.json | Where-Object { $_.Directory.Name -eq 'converter' } | Select-Object -First 1
-if (-not $Converter) { throw 'Folder converter resmi tidak ditemukan.' }
+$ModelRevision='f36e7edfe1684461a8343844af60babc2efbb727'
 $Model=Join-Path $Destination 'model';New-Item -ItemType Directory -Force $Model | Out-Null
-Copy-Item $Converter.FullName (Join-Path $Model 'config.json') -Force
-Copy-Item (Join-Path $Converter.Directory.FullName 'checkpoint.pth') (Join-Path $Model 'checkpoint.pth') -Force
+Write-Host 'Mengunduh converter V2 resmi MyShell (revision tetap, SHA256 diverifikasi) ...'
+Invoke-WebRequest "https://huggingface.co/myshell-ai/OpenVoiceV2/resolve/$ModelRevision/converter/config.json" -OutFile (Join-Path $Model 'config.json')
+Invoke-WebRequest "https://huggingface.co/myshell-ai/OpenVoiceV2/resolve/$ModelRevision/converter/checkpoint.pth" -OutFile (Join-Path $Model 'checkpoint.pth')
+$Expected='9652c27e92b6b2a91632590ac9962ef7ae2b712e5c5b7f4c34ec55ee2b37ab9e'
+if ((Get-FileHash (Join-Path $Model 'checkpoint.pth') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Expected) { throw 'Checksum model OpenVoice tidak cocok.' }
 Copy-Item (Join-Path $Repo 'LICENSE') (Join-Path $Destination 'LICENSE_OpenVoice.txt') -Force
 Copy-Item (Join-Path $PSScriptRoot 'worker.py') (Join-Path $Destination 'worker.py') -Force
 Run-Checked -Arguments @('-c','from openvoice.api import ToneColorConverter; import torch,librosa,soundfile; print("Dependencies OK")')
 @{source_commit=$Commit;model_sha256=(Get-FileHash (Join-Path $Model 'checkpoint.pth') -Algorithm SHA256).Hash;runtime='Python 3.11.9 / Torch 2.5.1 CPU';network_after_setup=$false} | ConvertTo-Json | Set-Content (Join-Path $Destination 'installation.json') -Encoding UTF8
-Remove-Item $ModelZip;Remove-Item $Unpack -Recurse -Force
+
 Write-Host "Selesai. Folder Voice Tools: $Destination"

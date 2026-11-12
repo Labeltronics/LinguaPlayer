@@ -89,7 +89,7 @@ class LanguageStudio(QDialog):
             b=QPushButton(text);b.clicked.connect(fn);row.addWidget(b);self.buttons.append(b)
         self.editor=QPlainTextEdit();self.editor.setPlaceholderText('SRT yang bisa diedit: waktu dan teks bahasa tujuan.');box.addWidget(self.editor,1)
         row=QHBoxLayout();box.addLayout(row);self.cancel_button=QPushButton('Batalkan');self.cancel_button.clicked.connect(self.cancel);self.cancel_button.setEnabled(False);row.addWidget(self.cancel_button)
-        b=QPushButton('Putar hasil');b.clicked.connect(self.play_output);row.addWidget(b);b=QPushButton('Sembunyikan • proses tetap jalan');b.clicked.connect(self.hide);row.addWidget(b)
+        b=QPushButton('Putar hasil');b.clicked.connect(self.play_output);row.addWidget(b);b=QPushButton('Video subtitle / lirik');b.clicked.connect(self.burn_text);row.addWidget(b);b=QPushButton('Sembunyikan • proses tetap jalan');b.clicked.connect(self.hide);row.addWidget(b)
         self.status=QLabel('Siap. Tidak ada file dikirim sebelum tombol Buat teks / dubbing online ditekan.');self.status.setWordWrap(True);box.addWidget(self.status)
         self.tray=None
         if QSystemTrayIcon.isSystemTrayAvailable():self.tray=QSystemTrayIcon(owner.windowIcon(),self);self.tray.setToolTip('Cyber80 Studio Bahasa');self.tray.show()
@@ -182,6 +182,12 @@ class LanguageStudio(QDialog):
         self.editor.setReadOnly(False);self.cancel_button.setEnabled(False)
     def cancel(self):
         if self.job:self.job.cancel();self.status.setText('Membatalkan … permintaan API aktif dapat menunggu timeout.')
+    def burn_text(self):
+        try:
+            cues=parse_srt(self.editor.toPlainText())
+            if not cues:raise ValueError('Buat/impor teks terlebih dahulu.')
+            self.owner.start_hardsub(self.source.text(),cues)
+        except Exception as exc:self.failed(str(exc))
     def play_output(self):
         if self.last_output:
             from cut_editor import PreviewPlayer
