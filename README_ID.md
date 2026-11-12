@@ -28,3 +28,5 @@ Studio Bahasa terpadu: lihat [STUDIO_BAHASA_ID.md](STUDIO_BAHASA_ID.md) untuk su
 Internet TV/IPTV: [INTERNET_TV_ID.md](INTERNET_TV_ID.md), katalog publik, impor M3U/XMLTV, parental control dan subtitle TV online (tertunda, tanpa dubbing TV).
 
 Cast / Mirroring ke Google Cast, DLNA dan browser HP: lihat [CAST_LAN_ID.md](CAST_LAN_ID.md). Daftar saluran publik TV sudah termasuk dalam paket; pilih negara/saluran tanpa memasukkan URL satu-satu.
+
+Kontrol pemutar bersama untuk file/browser/TV dan perekaman cuplikan online: lihat bagian terakhir INTERNET_TV_ID.md. Fitur editing/ekspor memakai file hasil unduhan atau rekaman.

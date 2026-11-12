@@ -42,7 +42,7 @@ class TVLoad(QThread):
 
 class InternetTV(QDialog):
     def __init__(self,owner):
-        super().__init__(owner,Qt.Window);self.owner=owner;self.cast_dialog=None;self.caption_job=None;self.caption_label=None;self.caption_queue=[];self.caption_clock=0.;self.job=None;self.preview=None;self.rows=[];self.visible_rows=[];self.programs=[];self.favorites=set();self.lock=ParentalLock(owner.settings if owner.storage_enabled and not owner.private_session else None)
+        super().__init__(owner,Qt.Window);self.owner=owner;self.cast_dialog=None;self.caption_label=None;self.job=None;self.preview=None;self.rows=[];self.visible_rows=[];self.programs=[];self.favorites=set();self.lock=ParentalLock(owner.settings if owner.storage_enabled and not owner.private_session else None)
         if self.lock.settings:
             try:self.favorites=set(json.loads(owner.settings.value('iptv/favorites','[]')))
             except (ValueError,TypeError):pass
@@ -66,8 +66,8 @@ class InternetTV(QDialog):
         if self.bundled.is_file():QTimer.singleShot(0,lambda:self.load('bundled',str(self.bundled)))
     def load(self,kind,source=''):
         if self.job:self.status.setText('Tunggu impor aktif selesai.');return
-        self.job=TVLoad(kind,source);self.job.loaded.connect(self.got_epg if kind=='epg' else self.got_rows);self.job.failed.connect(self.status.setText);self.job.finished.connect(self.finished);self.status.setText('Memuat di latar belakang …');self.job.start()
-    def finished(self):self.job.deleteLater();self.job=None
+        self.job=TVLoad(kind,source);self.job.loaded.connect(self.got_epg if kind=='epg' else self.got_rows);self.job.failed.connect(self.status.setText);self.job.finished.connect(self.load_finished);self.status.setText('Memuat di latar belakang …');self.job.start()
+    def load_finished(self):self.job.deleteLater();self.job=None
     def got_rows(self,rows):
         self.rows=rows
         for combo,field,label in ((self.country,'country','Semua negara'),(self.category,'category','Semua kategori')):
@@ -94,9 +94,13 @@ class InternetTV(QDialog):
         if not r:return
         if adult(r) and not self.lock.unlocked:self.status.setText('Saluran ini terkunci.');return
         if self.caption_job is not None:self.stop_subtitles();self.status.setText('Tunggu subtitle saluran sebelumnya berhenti sebelum pindah.');return
-        from cut_editor import PreviewPlayer
         if self.preview and not self.preview.released:self.preview.close()
-        self.playing_row=r;self.preview=PreviewPlayer(self.owner,r['url'],'Internet TV • '+r['name']);self.caption_label=QLabel('');self.caption_label.setTextFormat(Qt.PlainText);self.caption_label.setWordWrap(True);self.caption_label.setAlignment(Qt.AlignCenter);self.caption_label.setStyleSheet('background:#111;color:white;font-size:20px;padding:10px');self.preview.layout().addWidget(self.caption_label);self.preview.show()
+        self.playing_row=r;self.preview=self.owner.open_stream(r['url'],'Internet TV • '+r['name'],live=True);self.caption_label=self.owner.subtitle
+        if self.preview:self.preview.show();self.hide()
+    @property
+    def caption_job(self):return self.owner.online_job if self.preview and not self.preview.released else None
+    @property
+    def caption_queue(self):return self.owner.online_cues if self.preview and not self.preview.released else []
     def start_subtitles(self):
         if self.caption_job:return
         if not self.preview or self.preview.released:self.play()
@@ -104,21 +108,12 @@ class InternetTV(QDialog):
         import re
         language=self.subtitle_language.text().strip()
         if not re.fullmatch(r'[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8})?',language):self.subtitle_status.setText('Isi kode bahasa seperti id, en, ja.');return
-        from live_tv_subtitles import LiveTVSubtitles
-        self.caption_job=LiveTVSubtitles(self.playing_row['url'],self.owner.key.text().strip(),self.owner.model.text().strip(),language)
-        self.caption_job.progress.connect(self.subtitle_status.setText);self.caption_job.failed.connect(self.subtitle_status.setText);self.caption_job.captions.connect(self.got_captions);self.caption_job.finished.connect(self.caption_finished);self.caption_job.start()
-    def got_captions(self,cues,delay):
-        self.caption_queue=cues;self.caption_clock=time.monotonic();self.subtitle_status.setText(f'Subtitle tertunda sekitar {delay:.0f} detik karena pengambilan audio dan API. Bila API tertinggal, potongan lama dilewati.')
-    def caption_tick(self):
-        if self.caption_job and (not self.preview or self.preview.released):self.stop_subtitles()
-        if self.caption_label and self.preview and not self.preview.released:
-            elapsed=time.monotonic()-self.caption_clock
-            self.caption_label.setText('\n'.join((c.target or c.source) for c in self.caption_queue if c.start<=elapsed<c.end))
+        self.owner.start_online_subtitles(language)
+        if self.caption_job:self.caption_job.progress.connect(self.subtitle_status.setText);self.caption_job.failed.connect(self.subtitle_status.setText)
+    def caption_tick(self):pass
     def stop_subtitles(self):
-        if self.caption_job:self.caption_job.cancel();self.subtitle_status.setText('Membatalkan subtitle TV; tunggu permintaan API aktif selesai.')
-        self.caption_queue=[]
-    def caption_finished(self):
-        self.caption_job.deleteLater();self.caption_job=None;self.caption_queue=[]
+        if self.caption_job:self.owner.stop_online_subtitles()
+    def caption_finished(self):pass
     def cast(self):
         row=getattr(self,'playing_row',None) if self.preview and not self.preview.released else self.selected()
         if not row:return
@@ -150,7 +145,12 @@ class InternetTV(QDialog):
             else:self.status.setText('PIN salah atau percobaan dibatasi. Setelah lima kegagalan tunggu 30 detik.')
     def relock(self):
         self.stop_subtitles();self.lock.lock()
-        if self.cast_dialog:self.cast_dialog.stop()
+        row=getattr(self,'playing_row',None)
+        if row:
+            for cast in self.owner.cast_dialogs:
+                if cast.source==row['url']:cast.stop()
+            recording=self.owner.online_record_job
+            if recording is not None and recording.source==row['url']:self.owner.cancel_online_record()
         if self.preview and not self.preview.released:self.preview.close()
         self.got_rows(self.rows)
     def change_pin(self):

@@ -13,7 +13,7 @@ class NativeWheelHook:
         @self.callback_type
         def callback(code,message,param):
             try:
-                if code>=0 and message==0x020A and not owner.closing and owner.path:
+                if code>=0 and message==0x020A and not owner.closing and (owner.path or getattr(owner,'stream_url','')):
                     host=owner.pip or owner
                     if self.user.GetAncestor(self.user.GetForegroundWindow(),2)==int(host.winId()) and host.isVisible() and not host.isMinimized() and not (self.user.GetAsyncKeyState(0x11)&0x8000):
                         data=ctypes.cast(param,ctypes.POINTER(Data)).contents

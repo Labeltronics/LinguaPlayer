@@ -143,8 +143,12 @@ class PlayerExtras(CinemaTools):
         if not self._end_handled and self.path and self.player.get_state()==vlc.State.Ended and not self.processing and self.job is None:
             self._end_handled=True
             if self.auto_next_box.isChecked():QTimer.singleShot(0,lambda:self.next_film(1,True))
+    def seek_fraction(self,value):
+        if self.stream_url and not self.player.is_seekable():self.status.setText('Siaran ini tidak menyediakan seek/timeshift.');return
+        self.player.set_position(value)
     def seek_relative(self,seconds):
-        if not self.path:return
+        if not (self.path or self.stream_url):return
+        if self.stream_url and not self.player.is_seekable():self.status.setText('Siaran ini tidak menyediakan seek/timeshift.');return
         current=max(0,self.player.get_time());length=self.player.get_length()
         target=max(0,current+int(seconds*1000))
         if isinstance(length,int) and length>0:target=min(target,max(0,length-100))
@@ -212,7 +216,7 @@ class PlayerExtras(CinemaTools):
         other.status.setText('Pemutar kedua siap. Suara awal mute; klik Mute untuk mengaktifkan suara.')
         return other
     def eventFilter(self,obj,event):
-        if event.type()==QEvent.Wheel and obj is self.video and hasattr(self,'wheel_seconds') and self.path:
+        if event.type()==QEvent.Wheel and obj is self.video and hasattr(self,'wheel_seconds') and (self.path or self.stream_url):
             self.handle_video_wheel(event.angleDelta().y());return True
         if event.type()==QEvent.KeyPress and QApplication.activeWindow() is not None and QApplication.activeWindow() in (self,getattr(self,'pip',None)):
             if event.key()==Qt.Key_O and event.modifiers() & Qt.ControlModifier:self.open_video();return True

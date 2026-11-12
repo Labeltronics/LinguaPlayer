@@ -36,3 +36,10 @@ class CastTests(unittest.TestCase):
             device={'kind':'dlna','control':f'http://127.0.0.1:{server.server_port}/control','service':'urn:schemas-upnp-org:service:AVTransport:1'}
             job=CastAction(device,'load','http://192.168.1.2/video.mp4?key=test','video/mp4','Film & Test');errors=[];job.failed.connect(errors.append);job.run();self.assertFalse(errors);self.assertEqual(len(calls),2);self.assertIn('SetAVTransportURI',calls[0][0]);self.assertIn(b'Film &amp;amp; Test',calls[0][1]);self.assertIn('Play',calls[1][0])
         finally:server.shutdown();server.server_close()
+
+    def test_dlna_url_base_is_respected(self):
+        from cast_devices import renderer
+        from unittest.mock import patch
+        xml=b'<root xmlns="urn:schemas-upnp-org:device-1-0"><URLBase>http://127.0.0.1:1400/custom/</URLBase><device><friendlyName>Fixture TV</friendlyName><serviceList><service><serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType><controlURL>control</controlURL></service></serviceList></device></root>'
+        with patch('cast_devices.local_request',return_value=xml):
+            device=renderer('http://127.0.0.1:1400/device.xml');self.assertEqual(device['control'],'http://127.0.0.1:1400/custom/control')

@@ -38,6 +38,11 @@ def run_browser_checks(owner):
             stage='audio playback';javascript(view.page(),"document.getElementById('a').play().then(()=>true).catch(()=>false);true")
             wait(lambda:(javascript(view.page(),"document.getElementById('a').currentTime") or 0)>.2);report['actual_audio_playback']='PASS'
             stage='media detection';browser.scan();wait(lambda:any(v['name']=='fixture.webm' for v in browser.media));wait(lambda:any(v['name']=='fixture.wav' for v in browser.media));report['dom_network_mime_detection']='PASS'
+            stage='shared full player routing'
+            media_row=next(i for i,item in enumerate(browser.media) if item['name']=='fixture.webm');browser.media_table.selectRow(media_row);browser.play_selected()
+            wait(lambda:browser.preview is not None and not browser.preview.released and owner.stream_url==base+'/fixture.webm')
+            wait(lambda:owner.player.get_time()>200);assert browser.preview.player is owner.player and owner.path=='';report['browser_shared_full_player']='PASS'
+            browser.preview.close()
             stage='HTTP download queue';manager=owner.get_download_manager();target=root/'queued.bin';record=manager.add(base+'/download.bin','queued.bin',target=target,private=True)
             wait(lambda:record['status'] in ('Completed','Failed'));assert record['status']=='Completed',record;assert target.read_bytes()==payload;report['download_queue_real_http']='PASS'
             stage='document detection and download';wait(lambda:any(v['name']=='document.pdf' for v in browser.media));item=next(v for v in browser.media if v['name']=='document.pdf');doc_target=root/'saved-document.pdf';doc_record=manager.add(item['url'],item['name'],target=doc_target,private=True,provider=browser.headers_for);wait(lambda:doc_record['status'] in ('Completed','Failed'));assert doc_record['status']=='Completed',doc_record;assert doc_target.read_bytes()==document;report['document_detection_and_download']='PASS'

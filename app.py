@@ -88,7 +88,7 @@ class Window(PlayerExtras,QMainWindow):
     def __init__(self):
         super().__init__(); self.setWindowTitle('Cyber80 Players • Video & AI Subtitle');self.setWindowIcon(QIcon(str(ROOT/'assets'/'cyber80.ico'))); self.resize(1200,850)
         self.retry_context=None;self.resume_offset=0
-        self.path=''; self.job=None; self.cues=[];self.coverage=0.;self.processing=False;self.buffering=False;self.want_play=False
+        self.path='';self.stream_url=''; self.job=None; self.cues=[];self.coverage=0.;self.processing=False;self.buffering=False;self.want_play=False
         self.pip=None;self.pending_seek=None;self.pending_pause=False;self.closing=False;self.playback_error_reported=False;self.surface_generation=0
         self.log_path=Path(os.getenv('LOCALAPPDATA',tempfile.gettempdir()))/'Cyber80 Players'/'playback.log'
         self.log_path.parent.mkdir(parents=True,exist_ok=True)
@@ -113,7 +113,7 @@ class Window(PlayerExtras,QMainWindow):
         self.renderer.currentIndexChanged.connect(self.change_renderer)
         render_row=QHBoxLayout();layout.addLayout(render_row);render_row.addWidget(self.renderer);render_row.addStretch()
         self.button(render_row,'Log video',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.log_path))))
-        self.seek=QSlider(Qt.Horizontal); self.seek.setRange(0,1000); self.seek.sliderReleased.connect(lambda:self.player.set_position(self.seek.value()/1000)); row.addWidget(self.seek,1)
+        self.seek=QSlider(Qt.Horizontal); self.seek.setRange(0,1000); self.seek.sliderReleased.connect(lambda:self.seek_fraction(self.seek.value()/1000)); row.addWidget(self.seek,1)
         volume=QSlider(Qt.Horizontal); volume.setRange(0,200); volume.setValue(100); volume.setMaximumWidth(120); volume.valueChanged.connect(self.volume_changed); row.addWidget(QLabel('Volume'));row.addWidget(volume);self.player.audio_set_volume(100);self.volume=volume
         self.volume_percent=QSpinBox();self.volume_percent.setRange(0,200);self.volume_percent.setValue(100);self.volume_percent.setSuffix(' %');volume.valueChanged.connect(self.volume_percent.setValue);self.volume_percent.valueChanged.connect(volume.setValue);row.addWidget(self.volume_percent);self.button(row,'BOOST Maks',lambda:self.audio_panel.boost_preset(20));self.button(row,'Normal 100%',lambda:self.audio_panel.boost_preset(0))
         self.ai_panel=QWidget();ai_layout=QVBoxLayout(self.ai_panel)
@@ -194,8 +194,8 @@ class Window(PlayerExtras,QMainWindow):
         self.engine=self.make_engine(index);self.player=self.engine.media_player_new();self.configure_video_output()
         self.player.audio_set_volume(self.volume.value());self.player.audio_set_mute(self.mute_action.isChecked());self.request_audio_sync();self.apply_speed()
         self.audio_panel.reapply();self.apply_video_adjust()
-        if self.path:
-            self.player.set_media(self.engine.media_new_path(self.path))
+        if self.path or self.stream_url:
+            self.player.set_media(self.engine.media_new(self.stream_url) if self.stream_url else self.engine.media_new_path(self.path))
             if active:self.pending_seek=position;self.pending_pause=paused;self.player.play();self.apply_speed()
         self.status.setText('Mode tampilan: '+self.renderer.currentText())
     def queue_surface(self,position,active,paused):
@@ -225,13 +225,14 @@ class Window(PlayerExtras,QMainWindow):
         popup.hide();popup.deleteLater();self.pip_button.setText('PiP')
         if not self.closing:self.queue_surface(position,active,paused)
     def open_path(self,path):
+        if getattr(self,'online_job',None) is not None:self.stop_online_subtitles();raise RuntimeError('Tunggu subtitle online berhenti sebelum mengganti media.')
         if self.job is not None and self.job.isRunning():raise RuntimeError('Batalkan proses subtitle sebelum mengganti media.')
         self.surface_generation+=1
         path=Path(path).resolve()
         if not path.is_file():raise ValueError('File video/audio tidak ditemukan.')
         self.record_position()
         self.tv_generation+=1;self.tv_last_revision=-1;self.cues_4d=[]
-        self.player.stop();self.path=str(path);self.pending_seek=None;self.pending_pause=False;self.playback_error_reported=False
+        self.player.stop();self.stream_url='';self.online_caption=None;self.online_browser=None;self.online_dock.hide();self.path=str(path);self.pending_seek=None;self.pending_pause=False;self.playback_error_reported=False
         self.bind_video();self.player.set_media(self.engine.media_new_path(self.path))
         if self.player.play()==-1:raise RuntimeError('VLC gagal memulai video. Coba mode Kompatibel (CPU / GDI).')
         from player_extras import AUDIO_SUFFIXES
@@ -262,6 +263,7 @@ class Window(PlayerExtras,QMainWindow):
             try:self.open_path(p)
             except Exception as e:self.error(str(e))
     def stop(self):
+        if hasattr(self,'online_job'):self.stop_online_subtitles()
         self.surface_generation+=1;self.pending_seek=None;self.pending_pause=False
         self.want_play=False;self.player.stop()
     def play(self):
@@ -269,9 +271,10 @@ class Window(PlayerExtras,QMainWindow):
             self.want_play=not self.want_play
             if not self.want_play:self.player.set_pause(1)
             elif not self.buffering:self.player.play()
-        elif self.path:self.player.pause() if self.player.is_playing() else self.player.play()
+        elif self.path or self.stream_url:self.player.pause() if self.player.is_playing() else self.player.play()
     def process(self):
         if self.job is not None and self.job.isRunning():return
+        if self.stream_url:self.start_online_subtitles();return
         if not self.path:return self.error('Buka media terlebih dahulu.')
         lang=self.lang.currentData() if self.lang.currentText()==self.lang.itemText(self.lang.currentIndex()) else self.lang.currentText().strip()
         configuration=self.ai_configuration();self.cache_context=self.current_ai_context(lang)
@@ -341,7 +344,8 @@ class Window(PlayerExtras,QMainWindow):
     def tick(self):
         self.extra_tick()
         if self.pending_seek is not None and self.player.get_state()==vlc.State.Playing:
-            self.player.set_time(self.pending_seek);self.pending_seek=None;self.apply_speed();self.audio_panel.reapply();self.apply_video_adjust()
+            if not (self.stream_url and self.stream_live):self.player.set_time(self.pending_seek)
+            self.pending_seek=None;self.apply_speed();self.audio_panel.reapply();self.apply_video_adjust()
             if self.pending_pause:self.player.set_pause(1)
             self.pending_pause=False
         if not self.seek.isSliderDown():self.seek.setValue(max(0,int(self.player.get_position()*1000)))
@@ -351,6 +355,7 @@ class Window(PlayerExtras,QMainWindow):
         t=(self.player.get_time()-self.offset.value())/1000
         cue=next((c for c in self.cues if c.start<=t<c.end),None)
         self.subtitle.setText(('\n'.join(filter(None,[cue.source,cue.target])) if self.mode.currentIndex()==0 else (cue.target or cue.source) if self.mode.currentIndex()==1 else cue.source) if cue else '')
+        if self.stream_url and self.online_caption is not None:self.subtitle.setText(self.online_caption)
         if self.pip is not None:self.pip.caption.setText(self.subtitle.text())
         self.update_overlay()
         if self.player.get_state()==vlc.State.Error and not self.playback_error_reported:

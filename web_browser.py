@@ -233,9 +233,13 @@ class BrowserWindow(QDialog):
     def play_selected(self):
         data=self.selected()
         if not data:return
-        from cut_editor import PreviewPlayer
         if self.preview:self.preview.close()
-        self.preview=PreviewPlayer(self.owner,data['url'],'Media online (sumber langsung tanpa sesi login)');self.preview.show()
+        try:
+            self.preview=self.owner.open_stream(data['url'],'Browser • '+data['name'],live=False,browser=self)
+            if self.preview:
+                self.current().page().runJavaScript("document.querySelectorAll('video,audio').forEach(e=>e.pause());true")
+                self.preview.show();self.hide()
+        except Exception:self.status.setText('Sumber tidak bisa dibuka langsung. Unduh melalui browser lalu buka hasil di Cyber80.')
     def clear_media(self):self.media_epoch+=1;self.media=[];self.seen=set();self.media_table.setRowCount(0);self.unknown_budget=30
     def closeEvent(self,event):self.hide();event.ignore()
     def shutdown(self):

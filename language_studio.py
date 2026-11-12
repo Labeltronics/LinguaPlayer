@@ -111,7 +111,7 @@ class LanguageStudio(QDialog):
         if p:self.music.setText(p)
     def start(self,job):
         if self.job is not None:return
-        self.job=job;job.progress.connect(self.status.setText);job.failed.connect(self.failed);job.finished.connect(self.finished)
+        self.job=job;job.progress.connect(self.status.setText);job.failed.connect(self.failed);job.finished.connect(self.job_finished)
         for b in self.buttons:b.setEnabled(False)
         for w in (self.source,self.task,self.stream,self.language):w.setEnabled(False)
         self.editor.setReadOnly(True);self.cancel_button.setEnabled(True);job.start()
@@ -175,7 +175,7 @@ class LanguageStudio(QDialog):
         else:
             self.notice=QMessageBox(self);self.notice.setWindowTitle('Studio Bahasa');self.notice.setTextFormat(Qt.PlainText);self.notice.setText(message);self.notice.open()
     def failed(self,message):self.status.setText('Belum selesai: '+message)
-    def finished(self):
+    def job_finished(self):
         self.job.deleteLater();self.job=None
         for b in self.buttons:b.setEnabled(True)
         for w in (self.source,self.task,self.stream,self.language):w.setEnabled(True)

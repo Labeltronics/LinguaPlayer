@@ -24,7 +24,7 @@ def renderer(location):
         for service in root.findall('.//service'):
             kind=service.findtext('serviceType') or ''
             if ':service:AVTransport:' in kind:
-                control=local_url(urllib.parse.urljoin(location,service.findtext('controlURL') or ''))
+                control=local_url(urllib.parse.urljoin(root.findtext('URLBase') or location,service.findtext('controlURL') or ''))
                 return {'kind':'dlna','name':root.findtext('.//friendlyName') or urllib.parse.urlsplit(location).hostname,'control':control,'service':kind}
     except Exception:return None
 
@@ -80,7 +80,8 @@ class CastAction(QThread):
             else:
                 if self.isInterruptionRequested():return
                 if self.action=='load':
-                    metadata='<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"><item id="0" parentID="-1" restricted="1"><dc:title>'+html.escape(self.title)+'</dc:title><upnp:class>object.item.videoItem</upnp:class><res protocolInfo="http-get:*:'+html.escape(self.mime,quote=True)+':*">'+html.escape(self.url)+'</res></item></DIDL-Lite>'
+                    media_class='object.item.audioItem.musicTrack' if self.mime.startswith('audio/') else 'object.item.videoItem'
+                    metadata='<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"><item id="0" parentID="-1" restricted="1"><dc:title>'+html.escape(self.title)+'</dc:title><upnp:class>'+media_class+'</upnp:class><res protocolInfo="http-get:*:'+html.escape(self.mime,quote=True)+':*">'+html.escape(self.url)+'</res></item></DIDL-Lite>'
                     soap(d,'SetAVTransportURI',{'InstanceID':0,'CurrentURI':self.url,'CurrentURIMetaData':metadata});soap(d,'Play',{'InstanceID':0,'Speed':1})
                 else:soap(d,{'play':'Play','pause':'Pause','stop':'Stop'}[self.action],{'InstanceID':0,**({'Speed':1} if self.action=='play' else {})})
             self.completed.emit('Perintah dikirim ke perangkat. Periksa layar penerima.')

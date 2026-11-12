@@ -247,7 +247,9 @@ class ModernTools(AdvancedAddons):
                 self.status.setText('Semua cache subtitle dihapus.')
             except OSError as exc:self.error(str(exc))
     def start_utility(self,kind):
-        if not self.path or self.utility_job is not None or self.background_job is not None:return
+        if not self.path:
+            self.online_dock.show();self.online_status.setText('Alat cutting/ekspor membutuhkan media lokal. Rekam atau unduh media online dahulu.');return
+        if self.utility_job is not None or self.background_job is not None:return
         start=end=0
         if kind=='Potong klip MP4':
             start,ok=QInputDialog.getDouble(self,'Potong klip','Awal (detik):',0,0,1e8,3)

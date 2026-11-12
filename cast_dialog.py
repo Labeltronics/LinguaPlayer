@@ -60,8 +60,8 @@ class CastDialog(QDialog):
         self.device=device;ip=self.ip.currentText();mime=self.share.mime if self.mime.currentText()=='Otomatis' else self.mime.currentText()
         job=CastAction(device,'load',self.share.media_url(ip),mime,self.title,self.position,self.share.url(ip,'subtitle.vtt') if self.share.subtitle else '',self.live);self.run_job(job)
     def run_job(self,job):
-        self.job=job;job.completed.connect(self.status.setText);job.failed.connect(self.status.setText);job.finished.connect(self.finished);job.start()
-    def finished(self):
+        self.job=job;job.completed.connect(self.status.setText);job.failed.connect(self.status.setText);job.finished.connect(self.action_finished);job.start()
+    def action_finished(self):
         action=self.job.action;self.job.deleteLater();self.job=None
         if self.pending_stop and action!='stop' and self.device:self.pending_stop=False;self.command('stop')
         elif action=='stop':

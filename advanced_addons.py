@@ -4,14 +4,15 @@ from pathlib import Path
 from PySide6.QtCore import Qt,QEvent,QTimer
 from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QComboBox,QDoubleSpinBox,QSpinBox,QCheckBox,QDockWidget,QFileDialog,QInputDialog,QMessageBox,QScrollArea)
 from depth_stereo import StereoWorker,StereoExport,DEFAULT_MODEL
-class AdvancedAddons:
+from online_media import OnlineMedia
+class AdvancedAddons(OnlineMedia):
     def setup_addons(self):
         self.cast_dialogs=[];self.internet_tv=None;self.language_studio=None;self.download_manager=None;self.browsers=[];self.cut_editor=None;self.video_studio=None;self.tv_active=False;self.tv_worker=None;self.tv_export=None;self.tv_generation=0;self.tv_last_revision=-1;self.wheel_remainder=0;self.wheel_hook=None
         self.wheel_seconds=5
         if self.storage_enabled:
             try:self.wheel_seconds=max(1,min(300,int(self.settings.value('wheel_seconds',5))))
             except (ValueError,TypeError):pass
-        menu=self.menuBar().addMenu('Cyber80 Hub')
+        menu=self.menuBar().addMenu('Cyber80 Hub');self.setup_online(menu)
         for title,fn in [('Internet TV / IPTV',self.open_internet_tv),('Studio Bahasa • Subtitle / Dubbing / Lirik',self.open_language_studio),('Browser multimedia • Privat',lambda:self.open_browser(True)),('Browser normal (opsional)',lambda:self.open_browser(False)),('Download Manager',lambda:self.get_download_manager().show()),('Video Studio • Editor multilayer',lambda:self.open_video_studio()),('Koleksi media',self.show_collection),('Cutting visual',self.open_cut_editor),('3D / 4D Cinema',self.show_tv),('Atur scroll seek',self.set_wheel_seconds)]:menu.addAction(title,fn)
         self.tv_dock=QDockWidget('3D TV / Depth AI / 4D cue preview',self);self.tv_dock.setObjectName('tv3d');panel=QWidget();box=QVBoxLayout(panel)
         row=QHBoxLayout();box.addLayout(row);self.tv_enable=QCheckBox('Aktifkan stereo TV (bukan anaglyph)');row.addWidget(self.tv_enable)
@@ -78,9 +79,10 @@ class AdvancedAddons:
         browser.showNormal();browser.raise_();browser.activateWindow();return browser
     def open_cast(self,source=None,title='',cues=None,live=False):
         from cast_dialog import CastDialog
-        source=source or self.path
+        source=source or self.path or self.stream_url
         if not source:self.status.setText('Buka video/audio atau putar saluran TV terlebih dahulu.');return None
-        dialog=CastDialog(self,source,title,cues if cues is not None else self.cues,0 if live else max(0,self.player.get_time())/1000,live)
+        live=live or (source==self.stream_url and self.stream_live)
+        dialog=CastDialog(self,source,title or (self.stream_title if source==self.stream_url else ''),cues if cues is not None else self.cues,0 if live else max(0,self.player.get_time())/1000,live)
         self.cast_dialogs.append(dialog);dialog.show();return dialog
     def open_internet_tv(self):
         if self.internet_tv is None:
@@ -99,7 +101,8 @@ class AdvancedAddons:
             if import_current and self.path:self.video_studio.import_paths([self.path])
         self.video_studio.showNormal();self.video_studio.raise_();self.video_studio.activateWindow();return self.video_studio
     def open_cut_editor(self):
-        if not self.path:self.status.setText('Buka video/audio lokal terlebih dahulu.');return
+        if not self.path:
+            self.online_dock.show();self.online_dock.raise_();self.online_status.setText('Rekam cuplikan atau unduh media dahulu, lalu buka file hasil untuk cutting visual.');return
         if self.cut_editor and not self.cut_editor.released:self.cut_editor.showNormal();self.cut_editor.raise_();return self.cut_editor
         from cut_editor import CutEditor
         self.cut_editor=CutEditor(self,self.path);self.cut_editor.show();return self.cut_editor
@@ -139,7 +142,9 @@ class AdvancedAddons:
         path,_=QFileDialog.getSaveFileName(self,'Capture tampilan zoom/3D','Cyber80_View.png','PNG (*.png)')
         if path and not self.video.grab().save(path):self.error('Capture tidak dapat disimpan.')
     def export_tv(self):
-        if not self.path or self.tv_export is not None:return
+        if not self.path:
+            self.online_dock.show();self.online_status.setText('Ekspor 3D membutuhkan file lokal: rekam/unduh dahulu. Preview 3D tetap dapat digunakan pada stream.');return
+        if self.tv_export is not None:return
         path,_=QFileDialog.getSaveFileName(self,'Ekspor stereo TV MP4',Path(self.path).stem+'_stereo.mp4','MP4 (*.mp4)')
         if not path:return
         self.tv_export=StereoExport(self.path,path,self.tv_settings());self.tv_export.progress.connect(self.tv_status.setText);self.tv_export.done.connect(lambda p:self.tv_status.setText('Ekspor stereo selesai: '+p));self.tv_export.failure.connect(self.tv_status.setText);self.tv_export.finished.connect(self.tv_export_finished);self.tv_export.start()
@@ -170,10 +175,13 @@ class AdvancedAddons:
                 self.cues_4d=cues
             except (OSError,ValueError,TypeError,KeyError) as exc:self.error('Profil cue tidak valid: '+str(exc))
     def addons_tick(self):
+        self.online_tick()
         if not hasattr(self,'cues_4d'):return
         t=max(0,self.player.get_time())/1000;active=[c for c in self.cues_4d if c['start']<=t<c['start']+c['duration']]
         self.cue_4d_label.setText('4D preview: '+', '.join(f'{c["effect"]} {c["intensity"]}%' for c in active) if active else '4D: tidak ada cue aktif (preview saja)')
     def addons_can_close(self):
+        if getattr(self,'online_job',None) is not None:self.stop_online_subtitles();self.status.setText('Menunggu subtitle online berhenti.');return False
+        if getattr(self,'online_record_job',None) is not None:self.cancel_online_record();self.status.setText('Menunggu rekaman online berhenti.');return False
         for cast in getattr(self,'cast_dialogs',[]):
             if not cast.shutdown():self.status.setText('Menunggu Cast berhenti.');return False
         tv=getattr(self,'internet_tv',None)

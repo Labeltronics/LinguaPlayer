@@ -167,7 +167,8 @@ class CinemaTools(ModernTools):
             if row>=0:listing.takeItem(row);self.media_store.update(self.path,bookmarks=[listing.item(i).data(Qt.UserRole) for i in range(listing.count())])
         remove.clicked.connect(delete);dialog.resize(500,350);dialog.exec()
     def mark_ab(self):
-        if not self.path:return
+        if not (self.path or self.stream_url):return
+        if self.stream_url and not self.player.is_seekable():self.status.setText('Loop A–B membutuhkan stream yang mendukung seek.');return
         position=max(0,self.player.get_time())
         if self.ab_a is None:self.ab_a=position;self.status.setText('Titik A: '+stamp(position)+'. Tekan A–B lagi untuk titik B.')
         elif self.ab_b is None:
@@ -182,7 +183,7 @@ class CinemaTools(ModernTools):
         if (self.stereo_on or self.canvas_active()) and self.video.image is not None:
             if not self.video.image.save(str(path)):raise RuntimeError('Gambar tidak dapat disimpan.')
         else:
-            source=self.path;seconds=max(0,self.player.get_time())/1000
+            source=self.path or self.stream_url;seconds=0 if self.stream_url and self.stream_live else max(0,self.player.get_time())/1000
             def stamp_file():
                 try:value=Path(path).stat();return (value.st_size,value.st_mtime_ns)
                 except OSError:return None
@@ -201,8 +202,8 @@ class CinemaTools(ModernTools):
         self.snapshot_job=SnapshotJob(source,path,seconds);self.snapshot_job.ready.connect(lambda p:self.status.setText('Screenshot tersimpan: '+p));self.snapshot_job.failure.connect(self.status.setText);self.snapshot_job.finished.connect(self.snapshot_finished);self.snapshot_job.start()
     def snapshot_finished(self):self.snapshot_job.deleteLater();self.snapshot_job=None
     def capture_dialog(self):
-        if not self.path:return
-        path,_=QFileDialog.getSaveFileName(self,'Simpan screenshot',f'Cyber80_{Path(self.path).stem}_{stamp(self.player.get_time()).replace(":","-")}.png','PNG (*.png)')
+        if not (self.path or self.stream_url):return
+        path,_=QFileDialog.getSaveFileName(self,'Simpan screenshot',f'Cyber80_{Path(self.path).stem if self.path else "Online"}_{stamp(self.player.get_time()).replace(":","-")}.png','PNG (*.png)')
         if path:
             try:self.capture_frame(path);self.status.setText('Permintaan screenshot: '+path)
             except Exception as exc:self.error(str(exc))
@@ -271,7 +272,8 @@ class CinemaTools(ModernTools):
         if not pix.isNull():self.thumbnail_label.setPixmap(pix);self.thumbnail_label.move(self.seek.mapToGlobal(self.seek.rect().topLeft()));self.thumbnail_label.show()
     def thumbnail_finished(self):self.thumbnail_job.deleteLater();self.thumbnail_job=None
     def start_export(self):
-        if not self.path or self.export_job is not None:return
+        if not self.path:self.status.setText('Rekam/unduh media online dahulu untuk ekspor peningkatan resolusi.');return
+        if self.export_job is not None:return
         path,_=QFileDialog.getSaveFileName(self,'Ekspor video yang ditingkatkan',Path(self.path).stem+'_Cyber80.mp4','MP4 (*.mp4)')
         if not path:return
         self.export_job=ExportJob(self.path,path,self.export_resolution.currentText(),self.export_encoder.currentText(),self.sharpness.value(),max(0,self.player.get_length())/1000)
