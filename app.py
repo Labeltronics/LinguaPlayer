@@ -80,8 +80,7 @@ class PictureWindow(QDialog):
         owner.button(controls,'Kembali ke pemutar',owner.leave_pip)
         self.setStyleSheet('QDialog{background:black} QPushButton{padding:7px}')
     def closeEvent(self,event):
-        if not self.addons_can_close():event.ignore();return
-        if self.background_job is not None and self.background_job.isRunning():self.status.setText('Subtitle attachment masih berjalan. Minimalkan aplikasi, atau batalkan pekerjaan dan tunggu selesai sebelum menutup.');event.ignore();return
+        # Closing PiP returns video to its owner; background jobs belong to Window.
         event.ignore();self.returning.emit()
 
 class Window(PlayerExtras,QMainWindow):
@@ -151,7 +150,10 @@ class Window(PlayerExtras,QMainWindow):
         self.apply_theme()
     def make_engine(self,mode):
         options=['--ignore-config','--no-video-title-show','--no-osd','--video','--audio',
-                 '--audio-time-stretch','--no-plugins-cache','--file-logging','--logfile='+str(self.log_path),'--verbose=2']
+                 '--audio-time-stretch','--no-plugins-cache']
+        self._native_log_enabled=not bool(getattr(self,'stream_url','') or getattr(self,'private_session',False))
+        if self._native_log_enabled:options+=['--file-logging','--logfile='+str(self.log_path),'--verbose=2']
+        else:options+=['--quiet']
         if '--self-test' in sys.argv:options+=['--aout=dummy']
         if sys.platform=='win32':
             if vlcdir.is_dir():

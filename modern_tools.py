@@ -114,7 +114,7 @@ class ModernTools(AdvancedAddons):
         # Shared store must stay persistent for the other window; private window gets an isolated memory store.
         from storage import MediaStore
         self.media_store=MediaStore.shared(self.log_path.parent/'media-library.json',self.storage_enabled)
-        self.audio_panel.persist=self.storage_enabled
+        self.audio_panel.persist=self.storage_enabled;self.change_renderer(self.renderer.currentIndex())
         self.status.setText('Sesi privat: riwayat/cache baru tidak disimpan. File ekspor tetap tersimpan jika diminta.' if value else 'Penyimpanan riwayat aktif kembali.')
     def select_dsp(self,value):
         self.audio_dsp=value;self.change_renderer(self.renderer.currentIndex());self.status.setText('DSP audio: '+value+'. Bukan pemisahan dialog AI; sesuaikan volume speaker.')
