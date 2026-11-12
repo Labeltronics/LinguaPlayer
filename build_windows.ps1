@@ -15,6 +15,8 @@ $DnsPlan = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\cloudflar
 if ($LASTEXITCODE -ne 0) { throw 'DNS helper plan gagal.' }
 $DnsPlanObject = $DnsPlan | ConvertFrom-Json
 if ($DnsPlanObject.writes_dns -or $DnsPlanObject.servers[0] -ne '1.1.1.1') { throw 'DNS helper plan tidak sah.' }
+& $Python prepare_tv_catalog.py
+if ($LASTEXITCODE -ne 0) { throw 'Pembuatan katalog TV bawaan gagal.' }
 & $Python make_icon.py
 if ($LASTEXITCODE -ne 0) { throw 'Pembuatan ikon gagal.' }
 & $Python -m unittest discover -s tests -v
@@ -24,7 +26,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Verifikasi level audio native gagal.' }
 $VlcDirectory = Join-Path $env:ProgramFiles 'VideoLAN\VLC'
 if ($env:LINGUAPLAYER_VLC_DIR) { $VlcDirectory = $env:LINGUAPLAYER_VLC_DIR }
 if (-not (Test-Path (Join-Path $VlcDirectory 'libvlc.dll'))) { throw 'Pasang VLC Windows 64-bit resmi dahulu, atau set LINGUAPLAYER_VLC_DIR.' }
-& $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name Cyber80Players --icon assets/cyber80.ico --add-data "assets;assets" --add-data "sapi_dubbing.ps1;." --add-data "voice_tools;voice_tools" --add-data "cloudflare_dns.ps1;." --collect-all imageio_ffmpeg --collect-all onnxruntime --collect-all langdetect --add-data "models;models" --add-data "${VlcDirectory};vlc" app.py
+& $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name Cyber80Players --icon assets/cyber80.ico --add-data "assets;assets" --add-data "sapi_dubbing.ps1;." --add-data "voice_tools;voice_tools" --add-data "TV_CATALOG.json;." --add-data "cloudflare_dns.ps1;." --collect-all imageio_ffmpeg --collect-all onnxruntime --collect-all langdetect --collect-all pychromecast --collect-all zeroconf --add-data "models;models" --add-data "${VlcDirectory};vlc" app.py
 if ($LASTEXITCODE -ne 0) { throw 'Build gagal.' }
 & $Python optimize_bundle.py
 if ($LASTEXITCODE -ne 0) { throw 'Optimasi paket gagal.' }
@@ -35,6 +37,8 @@ Copy-Item AUDIT_CYBER80_PLAYERS_ID.md dist\Cyber80Players\
 Copy-Item PEMBARUAN_CYBER80_ID.md dist\Cyber80Players\
 Copy-Item CYBER80_BROWSER_3D_ID.md dist\Cyber80Players\
 Copy-Item VIDEO_STUDIO_ID.md dist\Cyber80Players\
+Copy-Item IPTV_CATALOG_INFO.json dist\Cyber80Players\
+Copy-Item CAST_LAN_ID.md dist\Cyber80Players\
 Copy-Item INTERNET_TV_ID.md dist\Cyber80Players\
 Copy-Item STUDIO_BAHASA_ID.md dist\Cyber80Players\
 Copy-Item AUDIO_BOOST_ID.md dist\Cyber80Players\

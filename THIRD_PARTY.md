@@ -19,3 +19,6 @@ Qt WebEngine/Chromium mengikuti lisensi Qt dan komponen Chromium dari distribusi
 
 
 Optional Voice Tools: OpenVoice (MyShell), MIT, source https://github.com/myshell-ai/OpenVoice, pinned commit 74a1d147b17a8c3092dd5430504bd83ef6c7eb23. Installer obtains official V2 converter separately and copies its LICENSE. Separate portable Python (PSF), PyTorch/Torchaudio (BSD), NumPy (BSD), librosa (ISC), SoundFile (BSD) and their dependencies retain package license metadata. No OpenVoice code/model or PyTorch is embedded in the main EXE.
+
+
+LAN casting uses PyChromecast (MIT) and zeroconf (LGPL); wheel notices are copied by bundle_licenses.py. Bundled public IPTV snapshot is generated from iptv-org/api (Unlicense); stream rights and availability remain with respective broadcasters. No NSFW directory, premium decryption or port-forwarding service is included.

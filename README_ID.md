@@ -26,3 +26,5 @@ Suara terlalu pelan: tombol **BOOST Maks** tersedia pada bar player. Panduan pen
 Studio Bahasa terpadu: lihat [STUDIO_BAHASA_ID.md](STUDIO_BAHASA_ID.md) untuk subtitle, lirik SRT/LRC, dubbing multibahasa (default Indonesia), serta voice cloning lokal OpenVoice gratis dan pemasangan tools opsional.
 
 Internet TV/IPTV: [INTERNET_TV_ID.md](INTERNET_TV_ID.md), katalog publik, impor M3U/XMLTV, parental control dan subtitle TV online (tertunda, tanpa dubbing TV).
+
+Cast / Mirroring ke Google Cast, DLNA dan browser HP: lihat [CAST_LAN_ID.md](CAST_LAN_ID.md). Daftar saluran publik TV sudah termasuk dalam paket; pilih negara/saluran tanpa memasukkan URL satu-satu.

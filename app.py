@@ -107,7 +107,7 @@ class Window(PlayerExtras,QMainWindow):
         self.subtitle.setStyleSheet('font-size:20px;color:#ffe18a;background:#131b2c;padding:10px'); layout.addWidget(self.subtitle)
         row=QHBoxLayout(); layout.addLayout(row)
         self.open=self.button(row,'Buka media',self.open_video); self.button(row,'▶ / Pause',self.play)
-        self.button(row,'Stop',self.stop);self.pip_button=self.button(row,'PiP',self.toggle_pip);self.fullscreen_button=self.button(row,'Full screen (F11)',self.toggle_fullscreen)
+        self.button(row,'Stop',self.stop);self.pip_button=self.button(row,'PiP',self.toggle_pip);self.fullscreen_button=self.button(row,'Full screen (F11)',self.toggle_fullscreen);self.button(row,'Cast',lambda:self.open_cast())
         self.renderer=QComboBox();self.renderer.addItems(['Kompatibel (CPU / GDI)','Otomatis (GPU)','Direct3D11','GPU Cinema (D3D11)'])
         if sys.platform!='win32':self.renderer.setCurrentIndex(1)
         self.renderer.currentIndexChanged.connect(self.change_renderer)
@@ -421,6 +421,8 @@ if __name__=='__main__':
                     language=w.open_language_studio();assert language.job is None;language.hide()
                     from iptv_checks import run_iptv_checks
                     with tempfile.TemporaryDirectory(prefix='cyber80-iptv-test-') as tv_root:playback['internet_tv']=run_iptv_checks(w,Path(tv_root))
+                    from cast_checks import run_cast_checks
+                    with tempfile.TemporaryDirectory(prefix='cyber80-cast-test-') as cast_root:playback['lan_cast']=run_cast_checks(w,Path(cast_root))
                     from audio_checks import run_audio_boost_checks
                     with tempfile.TemporaryDirectory(prefix='cyber80-boost-test-') as boost_root:playback['audio_boost']=run_audio_boost_checks(w,Path(boost_root))
                     from browser_checks import run_browser_checks

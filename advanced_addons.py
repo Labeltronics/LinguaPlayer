@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButto
 from depth_stereo import StereoWorker,StereoExport,DEFAULT_MODEL
 class AdvancedAddons:
     def setup_addons(self):
-        self.internet_tv=None;self.language_studio=None;self.download_manager=None;self.browsers=[];self.cut_editor=None;self.video_studio=None;self.tv_active=False;self.tv_worker=None;self.tv_export=None;self.tv_generation=0;self.tv_last_revision=-1;self.wheel_remainder=0;self.wheel_hook=None
+        self.cast_dialogs=[];self.internet_tv=None;self.language_studio=None;self.download_manager=None;self.browsers=[];self.cut_editor=None;self.video_studio=None;self.tv_active=False;self.tv_worker=None;self.tv_export=None;self.tv_generation=0;self.tv_last_revision=-1;self.wheel_remainder=0;self.wheel_hook=None
         self.wheel_seconds=5
         if self.storage_enabled:
             try:self.wheel_seconds=max(1,min(300,int(self.settings.value('wheel_seconds',5))))
@@ -76,6 +76,12 @@ class AdvancedAddons:
         browser=next((b for b in self.browsers if b.private==private),None)
         if browser is None:browser=BrowserWindow(self,private or self.private_session);self.browsers.append(browser)
         browser.showNormal();browser.raise_();browser.activateWindow();return browser
+    def open_cast(self,source=None,title='',cues=None,live=False):
+        from cast_dialog import CastDialog
+        source=source or self.path
+        if not source:self.status.setText('Buka video/audio atau putar saluran TV terlebih dahulu.');return None
+        dialog=CastDialog(self,source,title,cues if cues is not None else self.cues,0 if live else max(0,self.player.get_time())/1000,live)
+        self.cast_dialogs.append(dialog);dialog.show();return dialog
     def open_internet_tv(self):
         if self.internet_tv is None:
             from iptv_window import InternetTV
@@ -168,6 +174,8 @@ class AdvancedAddons:
         t=max(0,self.player.get_time())/1000;active=[c for c in self.cues_4d if c['start']<=t<c['start']+c['duration']]
         self.cue_4d_label.setText('4D preview: '+', '.join(f'{c["effect"]} {c["intensity"]}%' for c in active) if active else '4D: tidak ada cue aktif (preview saja)')
     def addons_can_close(self):
+        for cast in getattr(self,'cast_dialogs',[]):
+            if not cast.shutdown():self.status.setText('Menunggu Cast berhenti.');return False
         tv=getattr(self,'internet_tv',None)
         if tv:
             if tv.job is not None:tv.cancel();self.status.setText('Menunggu impor TV selesai.');return False

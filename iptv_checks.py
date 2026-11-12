@@ -24,6 +24,8 @@ def run_iptv_checks(owner,root):
         def log_message(self,*args):pass
     server=ThreadingHTTPServer(('127.0.0.1',0),Handler);threading.Thread(target=server.serve_forever,daemon=True).start();base=f'http://127.0.0.1:{server.server_port}'
     tv=owner.open_internet_tv();key=owner.key.text()
+    wait(lambda:tv.job is None and bool(tv.rows))
+    assert tv.bundled.is_file() and len(tv.rows)>100
     try:
         rows=parse_m3u(f'#EXTM3U\n#EXTINF:-1 tvg-id="fixture.id" tvg-country="ID" group-title="News",Local station\n{base}/station.mp4\n#EXTINF:-1 group-title="18+",Age restricted fixture\n{base}/station.mp4?age=18\n')
         tv.got_rows(rows);assert len(tv.visible_rows)==1;tv.table.selectRow(0);tv.play()
@@ -33,7 +35,7 @@ def run_iptv_checks(owner,root):
             tv.start_subtitles();wait(lambda:bool(tv.caption_queue),45);wait(lambda:tv.caption_label.text()=='Subtitle Indonesia');assert api.call_count>=1
             tv.stop_subtitles();wait(lambda:tv.caption_job is None)
         tv.lock.unlocked=True;tv.got_rows(rows);assert len(tv.visible_rows)==2;tv.relock();assert len(tv.visible_rows)==1 and tv.preview.released
-        return {'m3u_http_station_playback':'PASS','continuous_ffmpeg_audio_capture':'PASS','translated_caption_display':'PASS_MOCK_STT_NO_NETWORK_API','parental_default_lock_relock':'PASS','live_gemini_on_public_station':'NOT_RUN_NO_CREDENTIAL','public_catalog_availability':'NOT_GUARANTEED'}
+        return {'bundled_catalog_auto_load':'PASS','m3u_http_station_playback':'PASS','continuous_ffmpeg_audio_capture':'PASS','translated_caption_display':'PASS_MOCK_STT_NO_NETWORK_API','parental_default_lock_relock':'PASS','live_gemini_on_public_station':'NOT_RUN_NO_CREDENTIAL','public_catalog_availability':'NOT_GUARANTEED'}
     finally:
         owner.key.setText(key);tv.stop_subtitles()
         if tv.caption_job:wait(lambda:tv.caption_job is None)
