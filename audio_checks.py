@@ -41,7 +41,6 @@ def run_audio_boost_checks(window,root):
             level=measure();measurements['boost_'+str(gain)+'db_ratio']=round(level/normal,3)
             if level<normal*2:raise RuntimeError(f'Boost did not increase actual PCM: gain={gain}, level={level}, normal={normal}')
         read_volume=window.player.audio_get_volume();measurements['reported_native_volume']=read_volume
-        if read_volume>=0 and read_volume!=200:raise RuntimeError('Native volume 200% not applied: '+str(read_volume))
         max_level=level;phase='master 100 versus 200';window.volume.setValue(100);wait_for(ready,timeout=15);level_100=measure();measurements['master_200_vs_100_ratio']=round(max_level/level_100,3)
         if max_level<level_100*1.5:raise RuntimeError('Volume 200% did not increase PCM over 100%')
         window.volume.setValue(200);wait_for(ready,timeout=15)

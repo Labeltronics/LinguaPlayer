@@ -76,3 +76,10 @@ class AudioUITests(unittest.TestCase):
         try:
             w.player.audio_set_volume.return_value=0;w.player.audio_get_volume.return_value=-1;w.player.audio_get_mute.return_value=-1;w.request_audio_sync();w.sync_master_audio();self.assertEqual(w.audio_sync_deadline,0)
         finally:w.close();q.processEvents()
+
+    @patch.object(app.vlc,'Instance',side_effect=fake_engine)
+    def test_successful_volume_setter_does_not_retry_stale_readback(self,engine):
+        w=app.Window()
+        try:
+            w.player.audio_set_volume.return_value=0;w.player.audio_get_volume.return_value=0;w.player.audio_get_mute.return_value=0;w.request_audio_sync();w.sync_master_audio();self.assertEqual(w.audio_sync_deadline,0)
+        finally:w.close();q.processEvents()

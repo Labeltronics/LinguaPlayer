@@ -160,8 +160,9 @@ class PlayerExtras(CinemaTools):
         if not getattr(self,'audio_sync_deadline',0) or time.monotonic()>self.audio_sync_deadline:return
         wanted=self.volume.value();muted=self.mute_action.isChecked()
         try:
-            result=self.player.audio_set_volume(wanted);self.player.audio_set_mute(muted);read_volume=self.player.audio_get_volume();read_mute=self.player.audio_get_mute();self.last_audio_sync_result=result
-            if result==0 and (read_volume<0 or read_volume==wanted) and (read_mute<0 or read_mute==int(muted)):self.audio_sync_deadline=0
+            result=self.player.audio_set_volume(wanted);self.player.audio_set_mute(muted);self.last_audio_sync_result=result
+            # A successful setter is authoritative; some backends have stale/no readback.
+            if result==0:self.audio_sync_deadline=0
         except Exception:pass
     def volume_changed(self,value):
         self.player.audio_set_volume(value);self.request_audio_sync()
