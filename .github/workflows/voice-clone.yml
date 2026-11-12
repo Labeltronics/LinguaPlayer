@@ -1,0 +1,28 @@
+name: Test Free Voice Clone Tools
+on:
+  push:
+    branches: [main]
+    paths: ['voice_tools/**', 'voice_clone.py', 'dubbing.py', '.github/workflows/voice-clone.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  voice-tools:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install portable free CPU voice tools
+        shell: pwsh
+        run: ./voice_tools/setup_windows.ps1 -Destination "$env:RUNNER_TEMP/VoiceTools"
+      - name: Test actual OpenVoice converter
+        shell: pwsh
+        run: |
+          & "$env:RUNNER_TEMP/VoiceTools/python/python.exe" voice_tools/verify.py "$env:RUNNER_TEMP/VoiceTools"
+          if ($LASTEXITCODE -ne 0) { throw 'Voice converter test failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cyber80-Free-Voice-Tools-Test
+          path: |
+            ${{ runner.temp }}/VoiceTools/VOICE_TOOLS_TEST.json
+            ${{ runner.temp }}/VoiceTools/installation.json

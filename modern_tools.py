@@ -306,7 +306,7 @@ class ModernTools(AdvancedAddons):
         self.hardsub_button=QPushButton('Gabungkan subtitle film aktif → Simpan video baru');self.hardsub_button.clicked.connect(self.burn_current_subtitle);row.addWidget(self.hardsub_button)
         b=QPushButton('Gabungkan subtitle attachment terakhir');b.clicked.connect(self.burn_attachment_subtitle);row.addWidget(b)
         b=QPushButton('Buka folder hasil subtitle/video');b.clicked.connect(self.open_hardsub_folder);row.addWidget(b)
-        menu=self.menuBar().addMenu('Subtitle latar belakang');menu.addAction('Buat dari attachment video…',self.start_background_subtitles);menu.addAction('Batalkan pekerjaan',self.cancel_background)
+        menu=self.menuBar().addMenu('Studio Bahasa');menu.addAction('Subtitle / Dubbing / Lirik terpadu…',self.open_language_studio);menu.addAction('Buat dari attachment video…',self.start_background_subtitles);menu.addAction('Batalkan pekerjaan',self.cancel_background)
     def start_background_subtitles(self):
         if self.background_job is not None:self.status.setText('Satu pekerjaan attachment masih berjalan.');return
         key=self.key.text().strip()

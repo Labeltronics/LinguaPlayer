@@ -24,7 +24,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Verifikasi level audio native gagal.' }
 $VlcDirectory = Join-Path $env:ProgramFiles 'VideoLAN\VLC'
 if ($env:LINGUAPLAYER_VLC_DIR) { $VlcDirectory = $env:LINGUAPLAYER_VLC_DIR }
 if (-not (Test-Path (Join-Path $VlcDirectory 'libvlc.dll'))) { throw 'Pasang VLC Windows 64-bit resmi dahulu, atau set LINGUAPLAYER_VLC_DIR.' }
-& $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name Cyber80Players --icon assets/cyber80.ico --add-data "assets;assets" --add-data "cloudflare_dns.ps1;." --collect-all imageio_ffmpeg --collect-all onnxruntime --collect-all langdetect --add-data "models;models" --add-data "${VlcDirectory};vlc" app.py
+& $Python -m PyInstaller --noconfirm --clean --windowed --onedir --name Cyber80Players --icon assets/cyber80.ico --add-data "assets;assets" --add-data "sapi_dubbing.ps1;." --add-data "voice_tools;voice_tools" --add-data "cloudflare_dns.ps1;." --collect-all imageio_ffmpeg --collect-all onnxruntime --collect-all langdetect --add-data "models;models" --add-data "${VlcDirectory};vlc" app.py
 if ($LASTEXITCODE -ne 0) { throw 'Build gagal.' }
 & $Python optimize_bundle.py
 if ($LASTEXITCODE -ne 0) { throw 'Optimasi paket gagal.' }
@@ -35,6 +35,7 @@ Copy-Item AUDIT_CYBER80_PLAYERS_ID.md dist\Cyber80Players\
 Copy-Item PEMBARUAN_CYBER80_ID.md dist\Cyber80Players\
 Copy-Item CYBER80_BROWSER_3D_ID.md dist\Cyber80Players\
 Copy-Item VIDEO_STUDIO_ID.md dist\Cyber80Players\
+Copy-Item STUDIO_BAHASA_ID.md dist\Cyber80Players\
 Copy-Item AUDIO_BOOST_ID.md dist\Cyber80Players\
 Copy-Item PROMPT_VIDEO_STUDIO_ID.md dist\Cyber80Players\
 Copy-Item GEMINI_LIVE_TEST_REPORT.json dist\Cyber80Players\

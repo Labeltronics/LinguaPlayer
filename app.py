@@ -415,6 +415,10 @@ if __name__=='__main__':
                     playback=run_playback_checks(w)
                     from studio_checks import run_studio_checks
                     with tempfile.TemporaryDirectory(prefix='cyber80-studio-test-') as studio_root:playback['video_studio']=run_studio_checks(w,Path(studio_root))
+                    from dubbing_checks import run_dubbing_checks
+                    with tempfile.TemporaryDirectory(prefix='cyber80-dubbing-test-') as dub_root:playback['dubbing']=run_dubbing_checks(Path(dub_root))
+                    assert (ROOT/'sapi_dubbing.ps1').is_file()
+                    language=w.open_language_studio();assert language.job is None;language.hide()
                     from audio_checks import run_audio_boost_checks
                     with tempfile.TemporaryDirectory(prefix='cyber80-boost-test-') as boost_root:playback['audio_boost']=run_audio_boost_checks(w,Path(boost_root))
                     from browser_checks import run_browser_checks
