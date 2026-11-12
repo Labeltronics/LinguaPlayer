@@ -2,7 +2,7 @@
 import json,math,os,sys
 from pathlib import Path
 import vlc
-from audio_gain import boost_value,boosted_preamp,audio_signature
+from audio_gain import boost_value,boosted_preamp,audio_signature,VLC_EQ_NEUTRAL_DB
 from PySide6.QtCore import Qt,QTimer
 from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QCheckBox,QComboBox,QSlider,
     QPushButton,QDoubleSpinBox,QSpinBox,QInputDialog,QFileDialog,QMessageBox)
@@ -91,7 +91,7 @@ class AudioPanel(QWidget):
         self.rebuild_presets();self.load();self._loading=False;self.changed()
     def boost_preset(self,value):
         self.owner.audio_dsp='off'
-        self.set_state({'enabled':value>0,'preamp':0,'bands':[0.]*10,'headroom':value>0,'boost':value,'peak_guard':True})
+        self.set_state({'enabled':False,'preamp':0,'bands':[0.]*10,'headroom':value>0,'boost':value,'peak_guard':True})
         self.preset.blockSignals(True);self.preset.setCurrentText('Normal / Flat' if value==0 else 'Manual');self.preset.blockSignals(False)
         self.owner.volume.setValue(200 if value>=20 else 100 if value==0 else max(100,self.owner.volume.value()));self.apply()
         self.owner.status.setText(f'Audio Boost {value:+g} dB • volume {self.owner.volume.value()}%. Bila suara pecah, kurangi boost. Kompresor bukan limiter brick-wall setelah semua gain.')
@@ -126,10 +126,10 @@ class AudioPanel(QWidget):
             self.owner.change_renderer(self.owner.renderer.currentIndex());return
         player=self.owner.player;new=None
         try:
-            if state['enabled'] or state['boost']:
+            if state['enabled']:
                 new=vlc.AudioEqualizer()
                 if new is None:raise RuntimeError('Equalizer VLC tidak tersedia.')
-                if new.set_preamp(boosted_preamp(state['preamp'] if state['enabled'] else 0,state['bands'] if state['enabled'] else [0]*10,state['headroom'] if state['enabled'] else False,state['boost']))==-1:raise RuntimeError('Preamp tidak didukung.')
+                if new.set_preamp(VLC_EQ_NEUTRAL_DB)==-1:raise RuntimeError('Preamp tidak didukung.')
                 for i,gain in enumerate(state['bands'] if state['enabled'] else [0]*10):
                     if new.set_amp_at_index(gain,i)==-1:raise RuntimeError('Band equalizer tidak didukung.')
             # LibVLC set_equalizer replaces the whole filter chain. The engine now

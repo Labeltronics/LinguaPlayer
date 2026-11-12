@@ -1,5 +1,6 @@
-"""Bounded native playback boost and compressor configuration."""
+"""Calibrated VLC playback gain and filter-chain configuration."""
 import math
+VLC_EQ_NEUTRAL_DB=20*math.log10(4.) # VLC equalizer has a fixed 0.25 input coefficient.
 def boost_value(value):
     n=float(value)
     if not math.isfinite(n):raise ValueError('Audio Boost harus angka terbatas.')
@@ -17,13 +18,20 @@ def dsp_options(mode='off',boost=0.,guard=True):
         else:options+=['--compressor-threshold=-18','--compressor-ratio=4','--compressor-attack=25','--compressor-release=100','--compressor-makeup-gain=2']
     return (['--audio-filter='+':'.join(filters)] if filters else [])+options
 
+def audio_plan(state,mode='off'):
+    enabled=bool(state.get('enabled',False));boost=boost_value(state.get('boost',0));bands=tuple(float(v) for v in state.get('bands',[0.]*10)) if enabled else (0.,)*10;gain=boosted_preamp(state.get('preamp',0) if enabled else 0,bands,state.get('headroom',True) if enabled else False,boost)
+    filters=['equalizer'] if enabled else [];parameters={};dsp=[]
+    for value in dsp_options(mode,boost,state.get('peak_guard',True)):
+        name,data=value[2:].split('=',1)
+        if name=='audio-filter':dsp=data.split(':')
+        else:parameters[name]=float(data)
+    if 'normvol' in dsp:filters.append('normvol')
+    if gain:filters.append('gain')
+    if 'compressor' in dsp:filters.append('compressor')
+    return {'filters':filters,'parameters':parameters,'eq_preamp':VLC_EQ_NEUTRAL_DB,'bands':bands,'gain_db':gain,'multiplier':10**(gain/20),'enabled':enabled}
 def audio_signature(state,mode='off'):
-    enabled=bool(state.get('enabled',False));boost=boost_value(state.get('boost',0));eq=enabled or boost>0;bands=tuple(state.get('bands',[0.]*10) if enabled else [0.]*10);gain=boosted_preamp(state.get('preamp',0) if enabled else 0,bands,state.get('headroom',True) if enabled else False,boost)
-    return (mode,eq,gain,bands,boost>0 and state.get('peak_guard',True))
+    plan=audio_plan(state,mode);return (tuple(plan['filters']),tuple(sorted(plan['parameters'].items())),plan['bands'],plan['gain_db'])
 def native_audio_options(state,mode='off'):
-    mode,eq,gain,bands,guard=audio_signature(state,mode);values=dsp_options(mode,state.get('boost',0),state.get('peak_guard',True));filters=[];rest=[]
-    for value in values:
-        if value.startswith('--audio-filter='):filters.extend(value.split('=',1)[1].split(':'))
-        else:rest.append(value)
-    if eq:filters.insert(0,'equalizer');rest+=['--equalizer-preamp='+format(gain,'.9g'),'--equalizer-bands='+' '.join(format(float(v),'.9g') for v in bands),'--no-equalizer-2pass']
-    return ['--audio-filter='+':'.join(filters)]+rest
+    plan=audio_plan(state,mode);values=['--audio-filter='+':'.join(plan['filters']),'--gain-value='+format(plan['multiplier'],'.9g')]
+    if plan['enabled']:values+=['--equalizer-preamp='+format(plan['eq_preamp'],'.9g'),'--equalizer-bands='+' '.join(format(v,'.9g') for v in plan['bands']),'--no-equalizer-2pass']
+    return values+['--'+name+'='+format(value,'.9g') for name,value in plan['parameters'].items()]

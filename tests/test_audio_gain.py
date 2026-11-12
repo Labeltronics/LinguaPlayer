@@ -12,5 +12,11 @@ class GainTests(unittest.TestCase):
     def test_native_chain_keeps_eq_and_compressor_and_explicit_bypass(self):
         from audio_gain import native_audio_options
         state={'enabled':True,'preamp':0,'bands':[0]*10,'headroom':True,'boost':12,'peak_guard':True}
-        values=native_audio_options(state);self.assertIn('--audio-filter=equalizer:compressor',values);self.assertIn('--equalizer-preamp=12',values)
-        self.assertEqual(native_audio_options({'enabled':False,'boost':0}),['--audio-filter='])
+        values=native_audio_options(state);self.assertIn('--audio-filter=equalizer:gain:compressor',values);self.assertTrue(any(v.startswith('--equalizer-preamp=12.041') for v in values));self.assertIn('--gain-value=3.98107171',values)
+        self.assertEqual(native_audio_options({'enabled':False,'boost':0}),['--audio-filter=','--gain-value=1'])
+
+    def test_flat_eq_neutralizes_native_quarter_gain(self):
+        from audio_gain import audio_plan,VLC_EQ_NEUTRAL_DB
+        p=audio_plan({'enabled':True,'bands':[0]*10,'preamp':0,'boost':0})
+        self.assertAlmostEqual(.25*10**(p['eq_preamp']/20)*p['multiplier'],1,places=6)
+        p=audio_plan({'enabled':False,'boost':20});self.assertAlmostEqual(p['multiplier'],10);self.assertNotIn('equalizer',p['filters'])

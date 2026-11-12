@@ -58,8 +58,8 @@ class AudioUITests(unittest.TestCase):
         constructor.side_effect=lambda:MagicMock(set_preamp=MagicMock(return_value=0),set_amp_at_index=MagicMock(return_value=0))
         w=app.Window()
         try:
-            self.assertEqual(w.volume.maximum(),200);w.audio_panel.boost_preset(20);self.assertEqual(w.volume.value(),200);w.audio_panel.native.set_preamp.assert_called_with(20)
-            w.audio_panel.enabled.setChecked(False);w.audio_panel.apply();w.audio_panel.native.set_preamp.assert_called_with(20);self.assertTrue(w.audio_panel.state()['peak_guard'])
+            self.assertEqual(w.volume.maximum(),200);w.audio_panel.boost_preset(20);self.assertEqual(w.volume.value(),200);self.assertIsNone(w.audio_panel.native);self.assertIn('--gain-value=10',engine.call_args.args)
+            w.audio_panel.enabled.setChecked(False);w.audio_panel.apply();self.assertIsNone(w.audio_panel.native);self.assertIn('--gain-value=10',engine.call_args.args);self.assertTrue(w.audio_panel.state()['peak_guard'])
             w.mute_action.setChecked(True);w.change_renderer(w.renderer.currentIndex());w.player.audio_set_mute.assert_called_with(True);w.audio_panel.boost_preset(0);self.assertEqual(w.volume.value(),100);self.assertEqual(w.audio_panel.state()['boost'],0);self.assertIsNone(w.audio_panel.native);self.assertFalse(w.audio_panel.enabled.isChecked());self.assertEqual(w.audio_dsp,'off')
         finally:w.close();q.processEvents()
 

@@ -92,7 +92,7 @@ class Window(PlayerExtras,QMainWindow):
         self.pip=None;self.pending_seek=None;self.pending_pause=False;self.closing=False;self.playback_error_reported=False;self.surface_generation=0
         self.log_path=Path(os.getenv('LOCALAPPDATA',tempfile.gettempdir()))/'Cyber80 Players'/'playback.log'
         self.log_path.parent.mkdir(parents=True,exist_ok=True)
-        self.engine=self.make_engine(0);self.player=self.engine.media_player_new()
+        self.engine=self.make_engine(0);self.player=self.engine.media_player_new();self.configure_native_audio()
         root=QWidget(); self.setCentralWidget(root); layout=QVBoxLayout(root)
         title=QLabel('Cyber80 Players  |  Video • Audio • AI Cinema'); title.setWordWrap(True);title.setStyleSheet('font-size:18px;font-weight:bold'); layout.addWidget(title)
         self.video_host=QWidget();self.host_layout=QVBoxLayout(self.video_host);self.host_layout.setContentsMargins(0,0,0,0)

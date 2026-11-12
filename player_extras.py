@@ -178,9 +178,14 @@ class PlayerExtras(CinemaTools):
         if enabled and getattr(self,'tv_active',False):self.tv_enable.setChecked(False)
         self.stereo_on=bool(enabled);self._last_frame_revision=-1;self._last_frame=None
         self.video.clear_frame();self.change_renderer(self.renderer.currentIndex())
+    def configure_native_audio(self):
+        from native_audio import configure
+        panel=getattr(self,'audio_panel',None);state=panel.state() if panel else {'enabled':False,'boost':0}
+        configure(self.player,state,getattr(self,'audio_dsp','off'))
     def configure_video_output(self):
         probe=getattr(self,'_selftest_audio_probe',None)
         if '--self-test' in sys.argv and probe is not None:probe.attach(self.player)
+        self.configure_native_audio()
         if getattr(self,'stereo_on',False) or self.canvas_active():
             size=(960,540) if self.stereo_on or getattr(self,'tv_active',False) else (3840,2160)
             self.memory_video=MemoryVideo(self.player,*size);self.video.setAttribute(Qt.WA_NoSystemBackground,False)
