@@ -11,15 +11,16 @@ from web_transfer import checked_url
 from video_render import flags
 class LiveTVSubtitles(DubbingJob):
     captions=Signal(object,float)
-    def __init__(self,url,key,model,language='id'):
-        super().__init__(checked_url(url),'',[],key=key,model=model,language=language)
+    def __init__(self,url,key,model,language='id',headers=None):
+        super().__init__(checked_url(url),'',[],key=key,model=model,language=language);self.headers=headers
     def run(self):
         try:
             if not self.key:raise ValueError('Isi Gemini API key di panel Subtitle / AI pemutar.')
             with tempfile.TemporaryDirectory(prefix='cyber80-tv-caption-') as folder:
                 root=Path(folder);last=-1
                 with tempfile.TemporaryFile() as errors:
-                    self.proc=subprocess.Popen([imageio_ffmpeg.get_ffmpeg_exe(),'-v','error','-rw_timeout','15000000','-re','-i',self.source,'-map','0:a:0','-vn','-ac','1','-ar','16000','-af','aresample=async=1','-c:a','pcm_s16le','-f','segment','-segment_time','15','-reset_timestamps','1',str(root/'part-%08d.wav')],stdout=subprocess.DEVNULL,stderr=errors,**flags())
+                    from tv_tuning import ffmpeg_headers
+                    self.proc=subprocess.Popen([imageio_ffmpeg.get_ffmpeg_exe(),'-v','error','-rw_timeout','15000000',*ffmpeg_headers(self.headers),'-re','-i',self.source,'-map','0:a:0','-vn','-ac','1','-ar','16000','-af','aresample=async=1','-c:a','pcm_s16le','-f','segment','-segment_time','15','-reset_timestamps','1',str(root/'part-%08d.wav')],stdout=subprocess.DEVNULL,stderr=errors,**flags())
                     try:
                         while not self.cancelled():
                             files=sorted(root.glob('part-*.wav'));ended=self.proc.poll() is not None

@@ -30,7 +30,7 @@ def run_iptv_checks(owner,root):
     try:
         rows=parse_m3u(f'#EXTM3U\n#EXTINF:-1 tvg-id="fixture.id" tvg-country="ID" group-title="News",Local station\n{base}/station.mp4?privacy_check={privacy_marker}\n#EXTINF:-1 group-title="18+",Age restricted fixture\n{base}/station.mp4?age=18\n')
         tv.got_rows(rows);assert len(tv.visible_rows)==1;tv.table.selectRow(0);tv.play()
-        wait(lambda:tv.preview.player.get_time()>300)
+        wait(lambda:tv.preview is not None and tv.preview.player.get_time()>300)
         assert tv.preview.player is owner.player and owner.path=='' and owner.stream_url==rows[0]['url']
         owner.audio_panel.boost_preset(6);wait(lambda:owner.pending_seek is None and owner.player.get_time()>100)
         assert owner.stream_url==rows[0]['url']
@@ -43,8 +43,8 @@ def run_iptv_checks(owner,root):
         with patch('live_tv_subtitles.transcribe',return_value=[Cue(0,14,'Test speech','Subtitle Indonesia','en')]) as api:
             tv.start_subtitles();wait(lambda:bool(tv.caption_queue),45);wait(lambda:tv.caption_label.text()=='Subtitle Indonesia');assert api.call_count>=1
             tv.stop_subtitles();wait(lambda:tv.caption_job is None)
-        tv.lock.unlocked=True;tv.got_rows(rows);assert len(tv.visible_rows)==2;tv.relock();assert len(tv.visible_rows)==1 and tv.preview.released
-        return {'online_native_logs_disabled':'PASS','pip_close_button_returns_to_player':'PASS','shared_full_player_engine':'PASS','eq_renderer_restart_preserves_online_source':'PASS','online_pip_preserves_source':'PASS','bundled_catalog_auto_load':'PASS','m3u_http_station_playback':'PASS','continuous_ffmpeg_audio_capture':'PASS','translated_caption_display':'PASS_MOCK_STT_NO_NETWORK_API','parental_default_lock_relock':'PASS','live_gemini_on_public_station':'NOT_RUN_NO_CREDENTIAL','public_catalog_availability':'NOT_GUARANTEED'}
+        tv.lock.unlocked=True;tv.section.addItem('Daftar 18+','adult');tv.section.setCurrentIndex(1);tv.got_rows(rows);assert len(tv.visible_rows)==1 and tv.visible_rows[0]['adult'];tv.relock();assert len(tv.visible_rows)==1 and tv.preview.released
+        return {'actual_video_preflight':'PASS','adult_separate_list_after_unlock':'PASS','online_native_logs_disabled':'PASS','pip_close_button_returns_to_player':'PASS','shared_full_player_engine':'PASS','eq_renderer_restart_preserves_online_source':'PASS','online_pip_preserves_source':'PASS','bundled_catalog_auto_load':'PASS','m3u_http_station_playback':'PASS','continuous_ffmpeg_audio_capture':'PASS','translated_caption_display':'PASS_MOCK_STT_NO_NETWORK_API','parental_default_lock_relock':'PASS','live_gemini_on_public_station':'NOT_RUN_NO_CREDENTIAL','public_catalog_availability':'NOT_GUARANTEED'}
     finally:
         owner.key.setText(key);tv.stop_subtitles()
         if tv.caption_job:wait(lambda:tv.caption_job is None)

@@ -186,6 +186,7 @@ class AdvancedAddons(OnlineMedia):
             if not cast.shutdown():self.status.setText('Menunggu Cast berhenti.');return False
         tv=getattr(self,'internet_tv',None)
         if tv:
+            if tv.tune_job is not None:tv.cancel_tune();self.status.setText('Menunggu pemeriksaan siaran berhenti.');return False
             if tv.job is not None:tv.cancel();self.status.setText('Menunggu impor TV selesai.');return False
             if tv.caption_job is not None:tv.stop_subtitles();self.status.setText('Menunggu subtitle TV berhenti.');return False
             tv.relock()

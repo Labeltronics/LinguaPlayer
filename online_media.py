@@ -10,7 +10,7 @@ from dubbing import DubbingJob
 from web_transfer import checked_url
 
 class StreamRecording(DubbingJob):
-    def __init__(self,source,target,seconds,start=0):super().__init__(source,target,[]);self.seconds=seconds;self.start=start
+    def __init__(self,source,target,seconds,start=0,headers=None):super().__init__(source,target,[]);self.seconds=seconds;self.start=start;self.headers=headers
     def execute(self):
         source=checked_url(self.source);target=Path(self.target).resolve()
         if target.exists():raise ValueError('Nama hasil sudah ada. Pilih nama baru.')
@@ -20,6 +20,8 @@ class StreamRecording(DubbingJob):
         try:
             args=[imageio_ffmpeg.get_ffmpeg_exe(),'-v','error','-y','-rw_timeout','15000000']
             if self.start:args+=['-ss',str(self.start)]
+            from tv_tuning import ffmpeg_headers
+            args+=ffmpeg_headers(self.headers)
             args+=['-re','-i',source,'-t',str(self.seconds),'-map','0:v:0?','-map','0:a:0?','-c:v','libx264','-preset','veryfast','-crf','22','-pix_fmt','yuv420p','-c:a','aac','-movflags','+faststart',str(partial)]
             self.progress.emit('Merekam cuplikan media online ke MP4 …');self.run_command(args)
             from video_render import probe
@@ -55,22 +57,29 @@ class OnlinePreview:
 
 class OnlineMedia:
     def setup_online(self,menu):
-        self.online_job=None;self.online_record_job=None;self.last_online_recording='';self.last_online_source='';self.online_caption=None;self.online_cues=[];self.online_clock=0.;self.stream_live=False;self.stream_title='';self.online_browser=None
+        self.stream_headers={};self.online_job=None;self.online_record_job=None;self.last_online_recording='';self.last_online_source='';self.online_caption=None;self.online_cues=[];self.online_clock=0.;self.stream_live=False;self.stream_title='';self.online_browser=None
         self.online_dock=QDockWidget('Media online • kontrol Cyber80 bersama',self);self.online_dock.setObjectName('online_media');panel=QWidget();box=QVBoxLayout(panel)
         self.online_status=QLabel('Media browser/TV memakai mesin pemutar yang sama: volume/EQ, fullscreen/PiP, zoom, capture, 3D preview dan Cast. Seek/speed bergantung stream. Editing/ekspor membutuhkan rekaman/unduhan lokal.');self.online_status.setTextFormat(Qt.PlainText);self.online_status.setWordWrap(True);box.addWidget(self.online_status)
         row=QHBoxLayout();box.addLayout(row)
         for text,fn in [('Subtitle online',self.start_online_subtitles),('Hentikan subtitle',self.stop_online_subtitles),('Rekam cuplikan MP4',self.record_online),('Batalkan rekaman',self.cancel_online_record),('Edit rekaman',self.edit_online_record),('Unduh lewat browser',self.show_online_browser)]:
             b=QPushButton(text);b.clicked.connect(fn);row.addWidget(b)
         self.online_dock.setWidget(panel);self.addDockWidget(Qt.BottomDockWidgetArea,self.online_dock);self.tabifyDockWidget(self.subtitle_dock,self.online_dock);self.online_dock.hide();menu.addAction('Kontrol media online',lambda:(self.online_dock.show(),self.online_dock.raise_()))
-    def open_stream(self,url,title='Media online',live=False,browser=None):
+    def open_stream(self,url,title='Media online',live=False,browser=None,headers=None):
         if self.online_job is not None:self.stop_online_subtitles();self.status.setText('Tunggu subtitle online berhenti, lalu pilih media lagi.');return None
         if self.job is not None and self.job.isRunning():self.status.setText('Batalkan subtitle file sebelum mengganti media.');return None
-        source=checked_url(url);was_online=bool(self.stream_url);self.record_position();self.surface_generation+=1;self.player.stop();self.path='';self.stream_url=source;self.stream_title=title;self.stream_live=live;self.online_browser=browser;self.online_caption=None;self.online_cues=[];self.pending_seek=None;self.pending_pause=False;self.playback_error_reported=False;self.cache_context=None;self.retry_context=None;self.resume_offset=0;self.ab_a=None;self.ab_b=None
+        from tv_tuning import media_headers
+        approved_headers=media_headers(headers)
+        source=checked_url(url);self.stream_headers=approved_headers;was_online=bool(self.stream_url);self.record_position();self.surface_generation+=1;self.player.stop();self.path='';self.stream_url=source;self.stream_title=title;self.stream_live=live;self.online_browser=browser;self.online_caption=None;self.online_cues=[];self.pending_seek=None;self.pending_pause=False;self.playback_error_reported=False;self.cache_context=None;self.retry_context=None;self.resume_offset=0;self.ab_a=None;self.ab_b=None
         self.tv_generation+=1;self.tv_last_revision=-1;self.cues_4d=[]
         if not was_online:self.change_renderer(self.renderer.currentIndex())
-        self.bind_video();media=self.engine.media_new(source);media.add_option(':network-caching=1500');self.player.set_media(media);self.video.audio_title='';self.video.clear_frame();self.fill([])
+        self.bind_video();media=self.make_stream_media();self.player.set_media(media);self.video.audio_title='';self.video.clear_frame();self.fill([])
         if self.player.play()==-1:raise RuntimeError('Sumber online tidak dapat diputar. Coba unduh media yang Anda berhak akses lalu buka file lokal.')
         self.apply_speed();self.player.audio_set_mute(self.mute_action.isChecked());self.request_audio_sync();self.online_dock.show();self.online_dock.raise_();self.online_status.setText(title+' • kontrol pemutar lengkap aktif. Subtitle online memiliki jeda analisis. Rekam/unduh sebelum cutting, editing dan ekspor.');self.setWindowTitle('Cyber80 Players • '+title);self.showNormal();self.raise_();self.activateWindow();return OnlinePreview(self,source)
+    def make_stream_media(self):
+        media=self.engine.media_new(self.stream_url);media.add_option(':network-caching=2500')
+        if self.stream_headers.get('User-Agent'):media.add_option(':http-user-agent='+self.stream_headers['User-Agent'])
+        if self.stream_headers.get('Referer'):media.add_option(':http-referrer='+self.stream_headers['Referer'])
+        return media
     def start_online_subtitles(self,language=None):
         if not self.stream_url:self.status.setText('Putar media online terlebih dahulu.');return
         if self.online_job:return
@@ -78,7 +87,7 @@ class OnlineMedia:
         if not isinstance(language,str):language=self.lang.currentData() if self.lang.currentIndex()>=0 and self.lang.currentText()==self.lang.itemText(self.lang.currentIndex()) else self.lang.currentText().strip()
         if not self.key.text().strip():self.online_status.setText('Isi Gemini API key pada Subtitle / AI.');return
         from live_tv_subtitles import LiveTVSubtitles
-        self.online_job=LiveTVSubtitles(self.stream_url,self.key.text().strip(),self.model.text().strip(),language or 'id');self.online_caption='';self.online_job.progress.connect(self.online_status.setText);self.online_job.failed.connect(self.online_status.setText);self.online_job.captions.connect(self.receive_online_captions);self.online_job.finished.connect(self.online_finished);self.online_job.start()
+        self.online_job=LiveTVSubtitles(self.stream_url,self.key.text().strip(),self.model.text().strip(),language or 'id',headers=self.stream_headers);self.online_caption='';self.online_job.progress.connect(self.online_status.setText);self.online_job.failed.connect(self.online_status.setText);self.online_job.captions.connect(self.receive_online_captions);self.online_job.finished.connect(self.online_finished);self.online_job.start()
     def receive_online_captions(self,cues,delay):
         self.online_cues=cues;self.online_clock=time.monotonic();
         languages=sorted({c.language for c in cues if c.language})
@@ -97,7 +106,7 @@ class OnlineMedia:
         if not ok:return
         target,_=QFileDialog.getSaveFileName(self,'Simpan cuplikan online dengan nama baru','Cyber80_Online.mp4','MP4 (*.mp4)')
         if not target:return
-        self.online_record_job=StreamRecording(self.stream_url,target,seconds,0 if self.stream_live else max(0,self.player.get_time())/1000);self.online_record_job.progress.connect(self.online_status.setText);self.online_record_job.completed.connect(self.record_ready);self.online_record_job.failed.connect(self.online_status.setText);self.online_record_job.finished.connect(self.record_finished);self.online_record_job.start()
+        self.online_record_job=StreamRecording(self.stream_url,target,seconds,0 if self.stream_live else max(0,self.player.get_time())/1000,headers=self.stream_headers);self.online_record_job.progress.connect(self.online_status.setText);self.online_record_job.completed.connect(self.record_ready);self.online_record_job.failed.connect(self.online_status.setText);self.online_record_job.finished.connect(self.record_finished);self.online_record_job.start()
     def record_ready(self,path):self.last_online_recording=path;self.last_online_source=self.online_record_job.source;self.online_status.setText('Rekaman selesai: '+path+' — pilih Edit rekaman atau buka file untuk memakai semua alat offline.')
     def record_finished(self):self.online_record_job.deleteLater();self.online_record_job=None
     def cancel_online_record(self):

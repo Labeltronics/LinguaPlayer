@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QDialog,QVBoxLayout,QHBoxLayout,QLineEdit,QPushBu
 from internet_tv import API,catalog,parse_m3u,parse_xmltv,filter_rows,adult
 from web_transfer import read_document,open_http
 from parental_control import ParentalLock
+from tv_tuning import TuneTV
 
 class TVLoad(QThread):
     loaded=Signal(object);failed=Signal(str)
@@ -42,26 +43,27 @@ class TVLoad(QThread):
 
 class InternetTV(QDialog):
     def __init__(self,owner):
-        super().__init__(owner,Qt.Window);self.owner=owner;self.cast_dialog=None;self.caption_label=None;self.job=None;self.preview=None;self.rows=[];self.visible_rows=[];self.programs=[];self.favorites=set();self.lock=ParentalLock(owner.settings if owner.storage_enabled and not owner.private_session else None)
+        super().__init__(owner,Qt.Window);self.owner=owner;self.tune_job=None;self.tune_generation=0;self.health={};self.cast_dialog=None;self.caption_label=None;self.job=None;self.preview=None;self.rows=[];self.visible_rows=[];self.programs=[];self.favorites=set();self.lock=ParentalLock(owner.settings if owner.storage_enabled and not owner.private_session else None)
         if self.lock.settings:
             try:self.favorites=set(json.loads(owner.settings.value('iptv/favorites','[]')))
             except (ValueError,TypeError):pass
         self.setWindowTitle('Cyber80 • Internet TV / IPTV');self.resize(1050,700);box=QVBoxLayout(self);row=QHBoxLayout();box.addLayout(row)
         for text,fn in [('Perbarui katalog dunia',lambda:self.load('catalog')),('Impor M3U file',self.import_file),('Impor M3U URL',self.import_url),('Impor XMLTV / EPG',self.import_epg),('Batalkan impor',self.cancel)]:
             b=QPushButton(text);b.clicked.connect(fn);row.addWidget(b)
-        row=QHBoxLayout();box.addLayout(row);self.search=QLineEdit();self.search.setPlaceholderText('Cari saluran / judul acara dari XMLTV yang diimpor');row.addWidget(self.search,1);self.country=QComboBox();self.country.addItem('Semua negara','');row.addWidget(self.country);self.category=QComboBox();self.category.addItem('Semua kategori','');row.addWidget(self.category);self.fav_only=QCheckBox('Favorit');row.addWidget(self.fav_only)
-        self.table=QTableWidget(0,4);self.table.setHorizontalHeaderLabels(['Saluran','Negara','Kategori','Sekarang / berikutnya']);self.table.setEditTriggers(QAbstractItemView.NoEditTriggers);self.table.setSelectionBehavior(QAbstractItemView.SelectRows);self.table.setSelectionMode(QAbstractItemView.SingleSelection);self.table.horizontalHeader().setStretchLastSection(True);self.table.doubleClicked.connect(self.play);box.addWidget(self.table,1)
+        row=QHBoxLayout();box.addLayout(row);self.section=QComboBox();self.section.addItem('Daftar umum','general');row.addWidget(self.section);self.search=QLineEdit();self.search.setPlaceholderText('Cari saluran / judul acara dari XMLTV yang diimpor');row.addWidget(self.search,1);self.country=QComboBox();self.country.addItem('Semua negara','');row.addWidget(self.country);self.category=QComboBox();self.category.addItem('Semua kategori','');row.addWidget(self.category);self.fav_only=QCheckBox('Favorit');row.addWidget(self.fav_only)
+        self.table=QTableWidget(0,5);self.table.setHorizontalHeaderLabels(['Saluran','Negara','Kategori','Sekarang / berikutnya','Kondisi sumber']);self.table.setEditTriggers(QAbstractItemView.NoEditTriggers);self.table.setSelectionBehavior(QAbstractItemView.SelectRows);self.table.setSelectionMode(QAbstractItemView.SingleSelection);self.table.horizontalHeader().setStretchLastSection(True);self.table.doubleClicked.connect(self.play);box.addWidget(self.table,1)
         row=QHBoxLayout();box.addLayout(row)
         for text,fn in [('Putar saluran',self.play),('Cast / Mirroring',self.cast),('Tambah/hapus favorit',self.favorite),('Buka 18+ dengan PIN',self.unlock),('Kunci kembali',self.relock),('Ganti PIN',self.change_pin)]:
             b=QPushButton(text);b.clicked.connect(fn);row.addWidget(b)
         row=QHBoxLayout();box.addLayout(row);self.subtitle_language=QLineEdit('id');self.subtitle_language.setMaximumWidth(70);row.addWidget(QLabel('Bahasa subtitle (ISO)'));row.addWidget(self.subtitle_language)
         b=QPushButton('Aktifkan subtitle online saluran');b.clicked.connect(self.start_subtitles);row.addWidget(b);b=QPushButton('Hentikan subtitle');b.clicked.connect(self.stop_subtitles);row.addWidget(b)
+        self.compat=QCheckBox('Tampilan kompatibel CPU untuk TV');self.compat.setChecked(True);row.addWidget(self.compat)
         self.subtitle_status=QLabel('Subtitle TV memakai Gemini dari potongan audio 15 detik. Ada jeda API; bukan siaran tanpa delay.');self.subtitle_status.setWordWrap(True);box.addWidget(self.subtitle_status)
         note=QLabel('Katalog publik IPTV-org berisi tautan siaran publik, tanpa saluran NSFW bawaan. Tidak semua saluran tersedia di setiap wilayah atau selalu online. Tidak membuka premium/DRM. Impor playlist Anda sendiri untuk saluran yang Anda berhak akses. Kategori 18+ pada playlist impor memerlukan PIN; metadata dapat salah sehingga PIN bukan penyaring isi video otomatis.');note.setWordWrap(True);box.addWidget(note)
         self.status=QLabel('Memuat daftar saluran bawaan. Pilih negara dan saluran; siaran memerlukan internet.');self.status.setWordWrap(True);box.addWidget(self.status)
         self.caption_timer=QTimer(self);self.caption_timer.timeout.connect(self.caption_tick);self.caption_timer.start(100)
         self.debounce=QTimer(self);self.debounce.setSingleShot(True);self.debounce.timeout.connect(self.refresh)
-        self.search.textChanged.connect(lambda:self.debounce.start(250));self.country.currentIndexChanged.connect(self.refresh);self.category.currentIndexChanged.connect(self.refresh);self.fav_only.toggled.connect(self.refresh)
+        self.search.textChanged.connect(lambda:self.debounce.start(250));self.country.currentIndexChanged.connect(self.refresh);self.category.currentIndexChanged.connect(self.refresh);self.fav_only.toggled.connect(self.refresh);self.section.currentIndexChanged.connect(self.section_changed)
         self.bundled=Path(__file__).resolve().parent/'TV_CATALOG.json'
         if self.bundled.is_file():QTimer.singleShot(0,lambda:self.load('bundled',str(self.bundled)))
     def load(self,kind,source=''):
@@ -72,7 +74,7 @@ class InternetTV(QDialog):
         self.rows=rows
         for combo,field,label in ((self.country,'country','Semua negara'),(self.category,'category','Semua kategori')):
             combo.blockSignals(True);combo.clear();combo.addItem(label,'')
-            values=sorted({v for r in rows if not adult(r) or self.lock.unlocked for v in (r[field].split(', ') if field=='category' else [r[field]]) if v})
+            values=sorted({v for r in rows if adult(r)==(self.section.currentData()=='adult') and (not adult(r) or self.lock.unlocked) for v in (r[field].split(', ') if field=='category' else [r[field]]) if v})
             for v in values:
                 label=(QLocale.territoryToString(QLocale.codeToTerritory(v))+' ('+v+')') if field=='country' and len(v)==2 else v
                 combo.addItem(label,v)
@@ -80,23 +82,42 @@ class InternetTV(QDialog):
         self.refresh()
     def got_epg(self,programs):self.programs=programs;self.refresh();self.status.setText(f'EPG dimuat: {len(programs)} acara. Pencocokan memakai tvg-id saluran.')
     def refresh(self,*args):
-        rows=filter_rows(self.rows,self.search.text(),self.country.currentData(),self.category.currentData(),self.favorites,self.fav_only.isChecked(),self.lock.unlocked,self.programs);self.visible_rows=rows[:3000];self.table.setRowCount(len(self.visible_rows));now=time.time();schedule={}
+        rows=filter_rows(self.rows,self.search.text(),self.country.currentData(),self.category.currentData(),self.favorites,self.fav_only.isChecked(),self.lock.unlocked,self.programs,section=self.section.currentData());self.visible_rows=rows[:3000];self.table.setRowCount(len(self.visible_rows));now=time.time();schedule={}
         for p in self.programs:
             if p['end']>now and (p['channel'] not in schedule or p['start']<schedule[p['channel']]['start']):schedule[p['channel']]=p
         for i,r in enumerate(self.visible_rows):
             p=schedule.get(r['id']);program=('Sekarang: ' if p['start']<=now else datetime.datetime.fromtimestamp(p['start']).strftime('%H:%M '))+p['title'] if p else 'EPG belum tersedia'
-            for j,value in enumerate([('★ ' if r['key'] in self.favorites else '')+('18+ • ' if adult(r) else '')+r['name'],r['country'],r['category'],program]):self.table.setItem(i,j,QTableWidgetItem(value))
+            for j,value in enumerate([('★ ' if r['key'] in self.favorites else '')+('18+ • ' if adult(r) else '')+r['name'],r['country'],r['category'],program,self.health.get(r['key'],'Belum diperiksa')]):self.table.setItem(i,j,QTableWidgetItem(value))
         self.status.setText(f'{len(rows)} hasil; {len(self.visible_rows)} ditampilkan. Persempit pencarian bila hasil lebih dari 3000. Parental: '+('terbuka' if self.lock.unlocked else 'terkunci'))
     def selected(self):
         i=self.table.currentRow();return self.visible_rows[i] if 0<=i<len(self.visible_rows) else None
+    def section_changed(self,*args):
+        self.cancel_tune();self.got_rows(self.rows)
+    def cancel_tune(self):
+        self.tune_generation+=1
+        if self.tune_job:self.tune_job.cancel()
     def play(self,*args):
         r=self.selected()
         if not r:return
-        if adult(r) and not self.lock.unlocked:self.status.setText('Saluran ini terkunci.');return
+        if adult(r) and (not self.lock.unlocked or self.section.currentData()!='adult'):self.status.setText('Saluran ini terkunci.');return
         if self.caption_job is not None:self.stop_subtitles();self.status.setText('Tunggu subtitle saluran sebelumnya berhenti sebelum pindah.');return
+        self.cancel_tune()
+        if self.tune_job:self.status.setText('Membatalkan pemeriksaan lama. Pilih Putar lagi setelah selesai.');return
+        generation=self.tune_generation;self.tune_job=TuneTV(self.rows,r)
+        self.tune_job.checked.connect(lambda key,status:self.tune_checked(generation,key,status))
+        self.tune_job.ready.connect(lambda row:self.tune_ready(generation,row))
+        self.tune_job.failed.connect(lambda message:self.status.setText(message) if generation==self.tune_generation else None)
+        self.tune_job.finished.connect(self.tune_finished);self.status.setText('Memeriksa frame video dan sumber alternatif …');self.tune_job.start()
+    def tune_checked(self,generation,key,status):
+        if generation!=self.tune_generation:return
+        self.health[key]=status;self.refresh();self.status.setText(status)
+    def tune_ready(self,generation,r):
+        if generation!=self.tune_generation or adult(r) and (not self.lock.unlocked or self.section.currentData()!='adult'):return
         if self.preview and not self.preview.released:self.preview.close()
-        self.playing_row=r;self.preview=self.owner.open_stream(r['url'],'Internet TV • '+r['name'],live=True);self.caption_label=self.owner.subtitle
+        if self.compat.isChecked():self.owner.renderer.setCurrentIndex(0)
+        self.playing_row=r;self.preview=self.owner.open_stream(r['url'],'Internet TV • '+r['name'],live=True,headers=r.get('headers'));self.caption_label=self.owner.subtitle
         if self.preview:self.preview.show();self.hide()
+    def tune_finished(self):self.tune_job.deleteLater();self.tune_job=None
     @property
     def caption_job(self):return self.owner.online_job if self.preview and not self.preview.released else None
     @property
@@ -141,10 +162,13 @@ class InternetTV(QDialog):
     def unlock(self):
         pin,ok=QInputDialog.getText(self,'Parental control','PIN:',QLineEdit.Password)
         if ok:
-            if self.lock.unlock(pin):self.got_rows(self.rows)
-            else:self.status.setText('PIN salah atau percobaan dibatasi. Setelah lima kegagalan tunggu 30 detik.')
+            if self.lock.unlock(pin):
+                if self.section.findData('adult')<0:self.section.addItem('Daftar 18+','adult')
+                self.section.setCurrentIndex(self.section.findData('adult'));self.got_rows(self.rows)
+            else:self.relock();self.status.setText('PIN salah atau percobaan dibatasi. Setelah lima kegagalan tunggu 30 detik.')
     def relock(self):
-        self.stop_subtitles();self.lock.lock()
+        self.cancel_tune();self.stop_subtitles();self.lock.lock()
+        self.section.blockSignals(True);self.section.clear();self.section.addItem('Daftar umum','general');self.section.blockSignals(False)
         row=getattr(self,'playing_row',None)
         if row:
             for cast in self.owner.cast_dialogs:
@@ -161,6 +185,7 @@ class InternetTV(QDialog):
             try:self.lock.change(old,new);self.relock();self.status.setText('PIN diganti.')
             except ValueError as exc:self.status.setText(str(exc))
     def cancel(self):
+        self.cancel_tune()
         if self.job:self.job.requestInterruption();self.status.setText('Membatalkan setelah permintaan aktif berhenti …')
     def closeEvent(self,event):
         self.relock();self.hide();event.ignore()

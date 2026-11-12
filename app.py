@@ -197,7 +197,7 @@ class Window(PlayerExtras,QMainWindow):
         self.player.audio_set_volume(self.volume.value());self.player.audio_set_mute(self.mute_action.isChecked());self.request_audio_sync();self.apply_speed()
         self.audio_panel.reapply();self.apply_video_adjust()
         if self.path or self.stream_url:
-            self.player.set_media(self.engine.media_new(self.stream_url) if self.stream_url else self.engine.media_new_path(self.path))
+            self.player.set_media(self.make_stream_media() if self.stream_url else self.engine.media_new_path(self.path))
             if active:self.pending_seek=position;self.pending_pause=paused;self.player.play();self.apply_speed()
         self.status.setText('Mode tampilan: '+self.renderer.currentText())
     def queue_surface(self,position,active,paused):

@@ -2,6 +2,7 @@
 import datetime,gzip,hashlib,json,re,xml.etree.ElementTree as ET
 from urllib.parse import urljoin
 from web_transfer import checked_url,read_document
+from tv_tuning import media_headers
 API='https://iptv-org.github.io/api/'
 MAX_ROWS=100000
 
@@ -9,20 +10,24 @@ def adult(row):return bool(row.get('adult'))
 def parse_m3u(text,base=''):
     if len(text.encode('utf-8'))>32*1024*1024:raise ValueError('Playlist terlalu besar.')
     if '#EXT-X-' in text:raise ValueError('Ini manifest HLS satu saluran, bukan daftar saluran M3U.')
-    rows=[];meta=None
+    rows=[];meta=None;headers={}
     for line in text.lstrip('\ufeff').splitlines():
         line=line.strip()
+        if line.startswith('#EXTVLCOPT:http-user-agent='):
+            headers['User-Agent']=line.split('=',1)[1];continue
+        if line.startswith('#EXTVLCOPT:http-referrer='):
+            headers['Referer']=line.split('=',1)[1];continue
         if line.startswith('#EXTINF:'):
             # Commas may occur inside quoted attributes.
             match=re.match(r'#EXTINF:(?:[^"\n]|"[^"\n]*")*?,',line)
             if not match:meta=None;continue
             attrs=dict(re.findall(r'([\w-]+)="([^"\n]*)"',line[:match.end()-1]));name=line[match.end():].strip()[:300]
-            group=attrs.get('group-title','Impor')[:150];meta={'id':attrs.get('tvg-id','')[:200],'name':name or 'Saluran','country':attrs.get('tvg-country','').upper()[:8],'category':group,'adult':bool(re.search(r'(?i)(?:\b18\+|adult|xxx|porn|dewasa)',group))}
+            group=attrs.get('group-title','Impor')[:150];meta={'id':attrs.get('tvg-id','')[:200],'name':name or 'Saluran','country':attrs.get('tvg-country','').upper()[:8],'category':group,'adult':attrs.get('tvg-adult','0')=='1' or bool(re.search(r'(?i)(?:\b18\+|adult|xxx|porn|dewasa)',group))}
         elif line and not line.startswith('#'):
             try:url=checked_url(urljoin(base,line) if base else line)
-            except ValueError:meta=None;continue
+            except ValueError:meta=None;headers={};continue
             row=meta or {'id':'','name':'Saluran','country':'','category':'Impor','adult':False}
-            row={**row,'url':url};row['key']=hashlib.sha256((row['id']+'|'+url).encode()).hexdigest();rows.append(row);meta=None
+            row={**row,'url':url,'headers':media_headers(headers)};headers={};row['key']=hashlib.sha256((row['id']+'|'+url).encode()).hexdigest();rows.append(row);meta=None
             if len(rows)>MAX_ROWS:raise ValueError('Terlalu banyak saluran.')
     if not rows:raise ValueError('Playlist tidak memiliki URL HTTP/HTTPS yang valid.')
     return rows
@@ -36,11 +41,12 @@ def catalog(channels,streams):
         if not isinstance(stream,dict):continue
         c=metadata.get(stream.get('channel'))
         if not c:continue
-        try:url=checked_url(stream.get('url',''))
+        try:
+            url=checked_url(stream.get('url',''));headers=media_headers({'User-Agent':stream.get('user_agent') or '', 'Referer':stream.get('referrer') or stream.get('http_referrer') or ''})
         except ValueError:continue
         key=hashlib.sha256((c['id']+'|'+url).encode()).hexdigest()
         if key in seen:continue
-        seen.add(key);rows.append({'id':c['id'],'name':str(c.get('name',c['id']))[:300],'url':url,'country':str(c.get('country','')),'category':', '.join(c.get('categories') or ['general']),'adult':False,'key':key})
+        seen.add(key);rows.append({'id':c['id'],'name':str(c.get('name',c['id']))[:300],'url':url,'country':str(c.get('country','')),'category':', '.join(c.get('categories') or ['general']),'adult':False,'key':key,'headers':headers})
     return rows
 
 def xmltv_time(value):
@@ -63,6 +69,6 @@ def parse_xmltv(data):
         if len(programs)>200000:raise ValueError('Program XMLTV terlalu banyak.')
     return programs
 
-def filter_rows(rows,query='',country='',category='',favorites=None,only_favorites=False,unlocked=False,programs=()):
+def filter_rows(rows,query='',country='',category='',favorites=None,only_favorites=False,unlocked=False,programs=(),section=None):
     query=query.casefold().strip();matches={p['channel'] for p in programs if query and query in p['title'].casefold()}
-    return [r for r in rows if (unlocked or not adult(r)) and (not country or r['country']==country) and (not category or category in r['category'].split(', ')) and (not only_favorites or r['key'] in (favorites or set())) and (not query or query in (r['name']+' '+r['id']).casefold() or r['id'] in matches)]
+    return [r for r in rows if (unlocked or not adult(r)) and (section is None or adult(r)==(section=='adult')) and (not country or r['country']==country) and (not category or category in r['category'].split(', ')) and (not only_favorites or r['key'] in (favorites or set())) and (not query or query in (r['name']+' '+r['id']).casefold() or r['id'] in matches)]
